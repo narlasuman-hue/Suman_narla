@@ -1,0 +1,9 @@
+id,username,email,password_hash
+1,alice_smith,alice@example.com,hashed_password_123
+2,bob_johnson,bob@example.com,hashed_password_456
+3,charlie_brown,charlie@example.com,hashed_password_789
+4,diana_prince,diana@example.com,hashed_password_012
+5,eve_anderson,eve@example.com,hashed_password_345
+6,frank_miller,frank@example.com,hashed_password_678
+7,grace_hopper,grace@example.com,hashed_password_901
+8,alice_smith,alice.smith@example.com,hashed_password_234

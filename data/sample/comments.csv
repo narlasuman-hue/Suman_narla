@@ -1,0 +1,15 @@
+id,post_id,user_id,content
+1,1,2,Great tutorial! Very helpful for beginners.
+2,1,3,Thanks for sharing this detailed guide.
+3,1,4,I found the examples very useful.
+4,2,5,Could you elaborate more on decorators?
+5,3,1,Django is indeed very powerful. Looking forward to more posts.
+6,3,3,Thanks for sharing this detailed guide.
+7,4,2,Excellent points on normalization and indexing.
+8,5,4,Machine learning is fascinating. More content please!
+9,5,5,I found the examples very useful.
+10,7,1,Cloud migration is complex but this helps a lot.
+11,8,2,API security is often overlooked. Good emphasis here.
+12,9,3,Pandas is incredibly powerful for data science.
+13,10,4,Security should be everyone's priority.
+14,2,6,This helped me understand decorators better.

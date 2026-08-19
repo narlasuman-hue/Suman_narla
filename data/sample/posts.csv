@@ -1,0 +1,11 @@
+id,user_id,title,content
+1,1,Getting Started with Python,Python is a versatile programming language. Here are some tips to get started with Python development.
+2,1,Advanced Python Techniques,Learn advanced techniques for writing efficient Python code including decorators and generators.
+3,2,Web Development with Django,Django is a powerful framework for building web applications. This post covers the basics and best practices.
+4,2,Database Design Principles,Understanding proper database design is crucial for building scalable applications.
+5,3,Machine Learning Fundamentals,An introduction to machine learning concepts and popular libraries like scikit-learn and TensorFlow.
+6,1,Getting Started with Python,Python is a versatile programming language. Here are some tips to get started with Python development.
+7,4,Cloud Computing Best Practices,Moving to the cloud? Learn about security, scalability, and cost optimization.
+8,5,API Development Guide,Build robust RESTful APIs with proper authentication and rate limiting.
+9,3,Data Analysis with Pandas,Pandas library provides powerful tools for data manipulation and analysis.
+10,6,Security in Software Development,Essential security practices every developer should follow.
