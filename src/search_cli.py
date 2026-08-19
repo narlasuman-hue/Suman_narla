@@ -3,7 +3,7 @@
 import argparse
 import sys
 from pathlib import Path
-from file_search import search_and_save
+from .file_search import search_and_save
 
 
 def main():
