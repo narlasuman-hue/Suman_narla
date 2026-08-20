@@ -1,0 +1,86 @@
+{
+  "table_name": "sales.customers",
+  "extraction_timestamp": "2024-08-20T10:30:45.123456Z",
+  "total_rows": 125000,
+  "total_batches": 3,
+  "format": "parquet",
+  "compression": "snappy",
+  "batch_details": [
+    {
+      "batch_number": 1,
+      "row_count": 50000,
+      "file_size_bytes": 5242880,
+      "s3_key": "raw/sales/customers/batch_00001.parquet",
+      "checksum": "abc123def456ghi789jkl012mno345pqr"
+    },
+    {
+      "batch_number": 2,
+      "row_count": 50000,
+      "file_size_bytes": 5242880,
+      "s3_key": "raw/sales/customers/batch_00002.parquet",
+      "checksum": "xyz789uvw456lmn123opq890rst567uvw"
+    },
+    {
+      "batch_number": 3,
+      "row_count": 25000,
+      "file_size_bytes": 2621440,
+      "s3_key": "raw/sales/customers/batch_00003.parquet",
+      "checksum": "pqr234stu901vwx678yza345bcd678efg"
+    }
+  ],
+  "schema": {
+    "customer_id": "INTEGER",
+    "customer_name": "VARCHAR(255)",
+    "email": "VARCHAR(255)",
+    "phone": "VARCHAR(20)",
+    "country": "VARCHAR(50)",
+    "city": "VARCHAR(50)",
+    "state": "VARCHAR(5)",
+    "postal_code": "VARCHAR(20)",
+    "created_date": "DATE",
+    "updated_date": "DATE",
+    "account_status": "VARCHAR(20)",
+    "credit_limit": "DECIMAL(15,2)",
+    "total_purchases": "DECIMAL(15,2)"
+  },
+  "column_statistics": {
+    "customer_id": {
+      "min": 1,
+      "max": 125000,
+      "null_count": 0,
+      "null_percentage": 0.0
+    },
+    "customer_name": {
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "avg_length": 35
+    },
+    "email": {
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "distinct_values": 124999
+    },
+    "state": {
+      "null_count": 15000,
+      "null_percentage": 12.0,
+      "distinct_values": 60
+    },
+    "account_status": {
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "distinct_values": 4,
+      "values": ["ACTIVE", "SUSPENDED", "INACTIVE", "PENDING"]
+    }
+  },
+  "extraction_duration_seconds": 245,
+  "rows_per_second": 510.2,
+  "validation_results": {
+    "row_count_match": true,
+    "schema_match": true,
+    "data_quality_score": 99.8
+  },
+  "source_table_row_count": 125000,
+  "extracted_row_count": 125000,
+  "missing_rows": 0,
+  "notes": "Successful extraction. All rows extracted without issues. No data quality issues detected."
+}

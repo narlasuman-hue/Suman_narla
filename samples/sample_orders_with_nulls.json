@@ -1,0 +1,67 @@
+[
+  {
+    "order_id": 10001,
+    "customer_id": 1,
+    "order_date": "2024-01-15",
+    "delivery_date": "2024-01-18",
+    "order_amount": 25000.00,
+    "tax_amount": 2500.00,
+    "total_amount": 27500.00,
+    "order_status": "DELIVERED",
+    "payment_method": "WIRE_TRANSFER",
+    "shipping_address": "New York NY 10001",
+    "notes": null
+  },
+  {
+    "order_id": 10002,
+    "customer_id": 2,
+    "order_date": "2024-01-16",
+    "delivery_date": "2024-01-20",
+    "order_amount": 50000.00,
+    "tax_amount": 5000.00,
+    "total_amount": 55000.00,
+    "order_status": "DELIVERED",
+    "payment_method": "CREDIT_CARD",
+    "shipping_address": "Los Angeles CA 90001",
+    "notes": "Priority shipment"
+  },
+  {
+    "order_id": 10003,
+    "customer_id": 3,
+    "order_date": "2024-01-17",
+    "delivery_date": "2024-01-25",
+    "order_amount": 15000.00,
+    "tax_amount": 1500.00,
+    "total_amount": 16500.00,
+    "order_status": "DELIVERED",
+    "payment_method": "BANK_TRANSFER",
+    "shipping_address": "Toronto ON M5H1A1",
+    "notes": null
+  },
+  {
+    "order_id": 10009,
+    "customer_id": 7,
+    "order_date": "2024-01-23",
+    "delivery_date": null,
+    "order_amount": 80000.00,
+    "tax_amount": 8000.00,
+    "total_amount": 88000.00,
+    "order_status": "PENDING",
+    "payment_method": "WIRE_TRANSFER",
+    "shipping_address": "Chicago IL 60601",
+    "notes": "On hold - credit review"
+  },
+  {
+    "order_id": 10015,
+    "customer_id": 4,
+    "order_date": "2024-01-29",
+    "delivery_date": null,
+    "order_amount": 68000.00,
+    "tax_amount": 6800.00,
+    "total_amount": 74800.00,
+    "order_status": "IN_TRANSIT",
+    "payment_method": "WIRE_TRANSFER",
+    "shipping_address": "Berlin Germany 10115",
+    "notes": null
+  }
+]

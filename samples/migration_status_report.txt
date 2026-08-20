@@ -1,0 +1,225 @@
+TERADATA TO AWS MIGRATION STATUS REPORT
+Generated: 2024-08-20 10:30:00 UTC
+
+================================================================================
+SUMMARY
+================================================================================
+Total Tables to Migrate: 10
+Tables Completed: 3
+Tables In Progress: 1
+Tables Pending: 6
+Tables Disabled: 2 (not migrating)
+
+Total Data Volume: ~850 GB (estimated)
+Data Migrated: ~125 GB (15%)
+Migration Timeline: Week 1 Complete
+
+================================================================================
+COMPLETED TABLES
+================================================================================
+
+1. sales.customers
+   Status: COMPLETED
+   Rows: 125,000
+   Size: 15 MB
+   Extraction Time: 4 min 5 sec
+   Throughput: 510 rows/sec
+   Validation: PASSED
+   S3 Location: s3://company-data-lake-raw/sales/customers/
+   Glue Status: REGISTERED
+   Athena Query: SELECT * FROM sales_customers LIMIT 10
+   Completion Date: 2024-08-15 14:30:00
+
+2. reference.products
+   Status: COMPLETED
+   Rows: 100,000
+   Size: 12 MB
+   Extraction Time: 3 min 20 sec
+   Throughput: 500 rows/sec
+   Validation: PASSED
+   S3 Location: s3://company-data-lake-raw/reference/products/
+   Glue Status: REGISTERED
+   Completion Date: 2024-08-16 09:15:00
+
+3. reference.warehouses
+   Status: COMPLETED
+   Rows: 500
+   Size: 0.5 MB
+   Extraction Time: 12 sec
+   Throughput: 42 rows/sec
+   Validation: PASSED
+   S3 Location: s3://company-data-lake-raw/reference/warehouses/
+   Glue Status: REGISTERED
+   Completion Date: 2024-08-16 10:30:00
+
+================================================================================
+IN PROGRESS
+================================================================================
+
+sales.orders
+   Status: RUNNING
+   Expected Total Rows: 50,000,000
+   Rows Extracted: 35,000,000 (70%)
+   Estimated Completion: 2024-08-22 16:00:00
+   Extraction Time Elapsed: 18 hours
+   Current Throughput: 540 rows/sec
+   Estimated Total Time: 26 hours
+   Batches Completed: 700 / 1000
+   Current Memory Usage: 2.4 GB
+   Last Log: "Saved batch 700 (50000 rows) to raw/sales/orders/batch_00700.parquet"
+
+================================================================================
+PENDING TABLES (Next 7 Days)
+================================================================================
+
+1. sales.order_items
+   Estimated Rows: 150,000,000
+   Estimated Size: 50 GB
+   Estimated Time: 72 hours
+   Scheduled Start: 2024-08-22 20:00:00
+   Priority: 2
+   Status: QUEUED
+
+2. finance.invoices
+   Estimated Rows: 10,000,000
+   Estimated Size: 5 GB
+   Estimated Time: 5 hours
+   Scheduled Start: 2024-08-25 12:00:00
+   Priority: 1
+   Status: QUEUED
+
+3. finance.payments
+   Estimated Rows: 20,000,000
+   Estimated Size: 8 GB
+   Estimated Time: 10 hours
+   Scheduled Start: 2024-08-26 14:00:00
+   Priority: 2
+   Status: QUEUED
+
+4. reference.currencies
+   Estimated Rows: 200
+   Estimated Size: 0.1 MB
+   Estimated Time: 1 min
+   Scheduled Start: 2024-08-28 09:00:00
+   Priority: 3
+   Status: QUEUED
+
+5. analytics.daily_sales_summary
+   Estimated Rows: 5,000,000
+   Estimated Size: 2 GB
+   Estimated Time: 3 hours
+   Scheduled Start: 2024-08-28 10:00:00
+   Priority: 4
+   Status: QUEUED
+
+6. analytics.customer_metrics
+   Estimated Rows: 2,000,000
+   Estimated Size: 1 GB
+   Estimated Time: 1.5 hours
+   Scheduled Start: 2024-08-29 09:00:00
+   Priority: 4
+   Status: DISABLED (to be enabled)
+
+================================================================================
+DISABLED TABLES (Not Migrating)
+================================================================================
+
+1. archive.old_transactions
+   Status: DISABLED
+   Estimated Rows: 500,000,000
+   Reason: Archive data - not needed in data lake (review for compliance)
+   Decision Date: 2024-08-10
+   Action: None (keep in Teradata)
+
+2. analytics.customer_metrics
+   Status: DISABLED
+   Estimated Rows: 2,000,000
+   Reason: Depends on analytics.daily_sales_summary completion
+   Action: Enable after daily_sales_summary completes
+
+================================================================================
+METRICS & STATISTICS
+================================================================================
+
+Performance:
+  Average Extraction Throughput: 517 rows/sec
+  Fastest Table: reference.warehouses (42 rows/sec - small table)
+  Slowest Table: sales.orders (540 rows/sec - large table)
+  Average Batch Size: 50,000 rows
+  Average Batch Processing Time: 95 seconds
+
+Data Quality:
+  Total Rows Validated: 225,500
+  Validation Pass Rate: 100%
+  Data Quality Score: 99.8%
+  Null Values Detected: Acceptable (< 15%)
+
+AWS Costs (Estimated):
+  S3 Storage: ~$2.50/day (current)
+  Glue: ~$0.50/hour execution
+  Athena: ~$0.01 per 1GB scanned
+  Total Weekly Cost: ~$17.50 (storage) + $12.00 (compute)
+
+Network:
+  Average Bandwidth Used: 125 MB/sec
+  Peak Bandwidth: 180 MB/sec
+  Network Errors: 0
+  Retry Count: 3 (automatic recovery)
+
+================================================================================
+ISSUES & RESOLUTIONS
+================================================================================
+
+1. RESOLVED: Connection timeout on 2024-08-18 at 03:45
+   - Issue: Network connection to Teradata lost
+   - Duration: 23 minutes
+   - Resolution: Automatic retry with exponential backoff
+   - Impact: Minimal (batch restarted)
+
+2. WARNING: High memory usage during sales.orders extraction
+   - Current: 2.4 GB (within limits)
+   - Status: Monitoring
+   - Action: Reduce batch size if exceeds 3.5 GB
+
+3. INFO: S3 upload latency increased 2024-08-19
+   - Cause: AWS region experiencing high load
+   - Status: Resolved
+   - Impact: 5% slower upload speed
+
+================================================================================
+NEXT ACTIONS (24 HOURS)
+================================================================================
+
+[ ] Complete sales.orders extraction (in progress)
+[ ] Validate sales.orders data quality
+[ ] Register sales.orders in Glue catalog
+[ ] Start sales.order_items extraction
+[ ] Monitor disk space (target: < 80% usage)
+[ ] Review network performance metrics
+
+================================================================================
+RISKS & MITIGATIONS
+================================================================================
+
+Risk: sales.order_items (150M rows) may take longer than estimated
+  Mitigation: Start early, monitor throughput, increase parallel workers if needed
+
+Risk: Data validation failures could block downstream tables
+  Mitigation: Run validation checks immediately after extraction
+
+Risk: S3 cost escalation due to large data volume
+  Mitigation: Configure S3 lifecycle policies to archive old data
+
+Risk: Network connectivity issues during large extractions
+  Mitigation: Implement retry logic, use Direct Connect for production
+
+================================================================================
+SIGN-OFF
+================================================================================
+
+Report Generated By: Claude Migration System
+Report Date: 2024-08-20 10:30:00 UTC
+Next Report: 2024-08-21 10:00:00 UTC
+
+Approver: [Pending]
+Date: [Pending]
