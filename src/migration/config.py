@@ -69,4 +69,4 @@ class MigrationConfig:
     @property
     def tables(self) -> list:
         """Get list of tables to migrate."""
-        return self.migration_config.get("tables", [])
+        return self.config.get("tables", [])
