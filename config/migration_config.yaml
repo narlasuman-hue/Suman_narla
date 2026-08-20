@@ -1,0 +1,50 @@
+# Teradata to AWS Migration Configuration
+
+# Teradata Connection Settings
+teradata:
+  host: "${TERADATA_HOST}"  # Use environment variables for sensitive data
+  port: 1025
+  username: "${TERADATA_USER}"
+  password: "${TERADATA_PASSWORD}"
+  database: "default_database"
+  connection_timeout: 30
+
+# AWS Configuration
+aws:
+  region: "us-east-1"
+  s3_bucket_raw: "teradata-migration-raw"
+  s3_bucket_processed: "teradata-migration-processed"
+  s3_bucket_metadata: "teradata-migration-metadata"
+  glue_role_arn: "${AWS_GLUE_ROLE_ARN}"
+
+# Migration Settings
+migration:
+  batch_size: 10000  # Number of rows per batch
+  format: "parquet"  # Output format: parquet, csv, orc
+  compression: "snappy"  # snappy, gzip, none
+  partition_strategy: "date"  # How to partition data (date, hash, range)
+  max_parallel_extracts: 5  # Number of parallel extraction jobs
+
+# Data Quality Checks
+quality:
+  enable_row_count_validation: true
+  enable_checksum_validation: true
+  enable_schema_validation: true
+  null_handling: "preserve"  # How to handle NULLs in source
+
+# Logging
+logging:
+  level: "INFO"
+  log_file: "logs/migration.log"
+
+# Tables Configuration
+tables:
+  - name: "schema.table1"
+    enabled: true
+    full_load: true
+    partition_column: null
+  - name: "schema.table2"
+    enabled: true
+    full_load: true
+    partition_column: "date"
+  # Add more tables as needed
