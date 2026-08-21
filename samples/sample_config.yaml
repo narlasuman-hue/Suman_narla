@@ -1,0 +1,133 @@
+# Sample Teradata to AWS Migration Configuration
+# This is a realistic example with multiple tables and different configurations
+
+# Teradata Connection Settings
+teradata:
+  host: "teradata.example.com"
+  port: 1025
+  username: "${TERADATA_USER}"
+  password: "${TERADATA_PASSWORD}"
+  database: "production"
+  connection_timeout: 30
+
+# AWS Configuration
+aws:
+  region: "us-east-1"
+  s3_bucket_raw: "company-data-lake-raw"
+  s3_bucket_processed: "company-data-lake-processed"
+  s3_bucket_metadata: "company-data-lake-metadata"
+  glue_role_arn: "${AWS_GLUE_ROLE_ARN}"
+
+# Migration Settings
+migration:
+  batch_size: 50000           # Rows per extraction batch
+  format: "parquet"           # parquet, csv, or json
+  compression: "snappy"       # snappy, gzip, none
+  partition_strategy: "date"  # Partitioning strategy
+  max_parallel_extracts: 3    # Number of parallel extraction jobs
+
+# Data Quality Checks
+quality:
+  enable_row_count_validation: true
+  enable_checksum_validation: false
+  enable_schema_validation: true
+  null_handling: "preserve"
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  log_file: "logs/migration.log"
+
+# Tables to Migrate
+tables:
+  # OLTP Tables
+  - name: "sales.customers"
+    enabled: true
+    full_load: true
+    partition_column: null
+    description: "Customer master data"
+    priority: 1
+
+  - name: "sales.orders"
+    enabled: true
+    full_load: true
+    partition_column: "order_date"
+    description: "Order transactions"
+    priority: 1
+    estimated_rows: 50000000
+
+  - name: "sales.order_items"
+    enabled: true
+    full_load: true
+    partition_column: "order_date"
+    description: "Order line items"
+    priority: 2
+    estimated_rows: 150000000
+
+  # Financial Data
+  - name: "finance.invoices"
+    enabled: true
+    full_load: true
+    partition_column: "invoice_date"
+    description: "Invoice records"
+    priority: 1
+    estimated_rows: 10000000
+
+  - name: "finance.payments"
+    enabled: true
+    full_load: true
+    partition_column: "payment_date"
+    description: "Payment records"
+    priority: 2
+    estimated_rows: 20000000
+
+  # Reference Data
+  - name: "reference.products"
+    enabled: true
+    full_load: true
+    partition_column: null
+    description: "Product master"
+    priority: 3
+    estimated_rows: 100000
+
+  - name: "reference.warehouses"
+    enabled: true
+    full_load: true
+    partition_column: null
+    description: "Warehouse locations"
+    priority: 3
+    estimated_rows: 500
+
+  - name: "reference.currencies"
+    enabled: true
+    full_load: true
+    partition_column: null
+    description: "Currency exchange rates"
+    priority: 3
+    estimated_rows: 200
+
+  # Analytics Tables (Lower Priority)
+  - name: "analytics.daily_sales_summary"
+    enabled: true
+    full_load: true
+    partition_column: "summary_date"
+    description: "Daily sales aggregates"
+    priority: 4
+    estimated_rows: 5000000
+
+  - name: "analytics.customer_metrics"
+    enabled: false  # Disabled for now
+    full_load: true
+    partition_column: null
+    description: "Customer KPI calculations"
+    priority: 4
+    estimated_rows: 2000000
+
+  # Archive Table (Not migrating)
+  - name: "archive.old_transactions"
+    enabled: false
+    full_load: true
+    partition_column: "transaction_date"
+    description: "Archive of old transactions"
+    priority: 5
+    estimated_rows: 500000000
