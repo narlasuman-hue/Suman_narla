@@ -58,10 +58,16 @@ app.include_router(databases.router, prefix="/api/v1", tags=["Databases"])
 app.include_router(tables.router, prefix="/api/v1", tags=["Tables"])
 app.include_router(jobs.router, prefix="/api/v1", tags=["Jobs"])
 
-# Import new routers for Phase 2
+# Import routers for Phase 2
 from src.api.routes import lifecycle, reports
 app.include_router(lifecycle.router, prefix="/api/v1", tags=["Lifecycle"])
 app.include_router(reports.router, prefix="/api/v1", tags=["Reports"])
+
+# Import routers for Phase 3
+from src.api.routes import lineage, search, query_analysis
+app.include_router(lineage.router, prefix="/api/v1", tags=["Lineage"])
+app.include_router(search.router, prefix="/api/v1", tags=["Search"])
+app.include_router(query_analysis.router, prefix="/api/v1", tags=["Query Analysis"])
 
 
 if __name__ == "__main__":
