@@ -61,7 +61,7 @@ class Table(Base):
     last_synced = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     database = relationship("Database", back_populates="tables")
-    columns = relationship("Column", back_populates="table", cascade="all, delete-orphan")
+    columns = relationship("TableColumn", back_populates="table", cascade="all, delete-orphan")
     lifecycle = relationship("AssetLifecycle", back_populates="table", cascade="all, delete-orphan", uselist=False)
     usage = relationship("UsageMetrics", back_populates="table", cascade="all, delete-orphan", uselist=False)
 
@@ -69,7 +69,7 @@ class Table(Base):
         return f"<Table(name={self.name}, db_id={self.db_id})>"
 
 
-class Column(Base):
+class TableColumn(Base):
     """Column entity."""
     __tablename__ = "columns"
 
@@ -86,7 +86,7 @@ class Column(Base):
     table = relationship("Table", back_populates="columns")
 
     def __repr__(self):
-        return f"<Column(name={self.name}, table_id={self.table_id})>"
+        return f"<TableColumn(name={self.name}, table_id={self.table_id})>"
 
 
 class View(Base):

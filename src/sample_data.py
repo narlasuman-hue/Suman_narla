@@ -5,11 +5,11 @@ Populates the database with realistic test data.
 
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from src.catalog.database import SessionLocal
+from src.catalog.database import SessionLocal, init_db
 from src.catalog.models import (
     Database,
     Table,
-    Column,
+    TableColumn,
     View,
     Job,
     JobExecution,
@@ -64,12 +64,13 @@ def create_sample_databases(db: Session) -> dict:
 
 def create_sample_tables(db_session: Session, databases: dict) -> dict:
     """Create sample tables."""
+    databases_list = list(databases.values())
     tables = [
         # Analytics tables
         Table(
-            database_id=databases[1].id,
+            db_id=databases_list[0].id,
             name="customers_table",
-            type="PERMANENT",
+            table_type="PERMANENT",
             status=AssetStatus.ACTIVE,
             description="Customer information including contact details and demographics",
             created_at=datetime.utcnow() - timedelta(days=365),
@@ -78,9 +79,9 @@ def create_sample_tables(db_session: Session, databases: dict) -> dict:
             size_mb=2048,
         ),
         Table(
-            database_id=databases[1].id,
+            db_id=databases_list[0].id,
             name="orders_table",
-            type="PERMANENT",
+            table_type="PERMANENT",
             status=AssetStatus.ACTIVE,
             description="Order transactions and history",
             created_at=datetime.utcnow() - timedelta(days=730),
@@ -89,9 +90,9 @@ def create_sample_tables(db_session: Session, databases: dict) -> dict:
             size_mb=15360,
         ),
         Table(
-            database_id=databases[1].id,
+            db_id=databases_list[0].id,
             name="analytics_summary",
-            type="PERMANENT",
+            table_type="PERMANENT",
             status=AssetStatus.ACTIVE,
             description="Daily aggregated analytics metrics",
             created_at=datetime.utcnow() - timedelta(days=180),
@@ -101,9 +102,9 @@ def create_sample_tables(db_session: Session, databases: dict) -> dict:
         ),
         # Raw data tables
         Table(
-            database_id=databases[2].id,
+            db_id=databases_list[1].id,
             name="raw_events",
-            type="PERMANENT",
+            table_type="PERMANENT",
             status=AssetStatus.ACTIVE,
             description="Raw event stream from application",
             created_at=datetime.utcnow() - timedelta(days=90),
@@ -112,9 +113,9 @@ def create_sample_tables(db_session: Session, databases: dict) -> dict:
             size_mb=40960,
         ),
         Table(
-            database_id=databases[2].id,
+            db_id=databases_list[1].id,
             name="staging_orders",
-            type="TEMPORARY",
+            table_type="TEMPORARY",
             status=AssetStatus.ACTIVE,
             description="Staging table for order data transformation",
             created_at=datetime.utcnow() - timedelta(days=60),
@@ -124,9 +125,9 @@ def create_sample_tables(db_session: Session, databases: dict) -> dict:
         ),
         # Customer tables
         Table(
-            database_id=databases[3].id,
+            db_id=databases_list[2].id,
             name="customer_profiles",
-            type="PERMANENT",
+            table_type="PERMANENT",
             status=AssetStatus.ACTIVE,
             description="Customer master data and profiles",
             created_at=datetime.utcnow() - timedelta(days=365),
@@ -135,9 +136,9 @@ def create_sample_tables(db_session: Session, databases: dict) -> dict:
             size_mb=4096,
         ),
         Table(
-            database_id=databases[3].id,
+            db_id=databases_list[2].id,
             name="customer_transactions",
-            type="PERMANENT",
+            table_type="PERMANENT",
             status=AssetStatus.INACTIVE,
             description="Customer transaction history (archived)",
             created_at=datetime.utcnow() - timedelta(days=1095),
@@ -147,9 +148,9 @@ def create_sample_tables(db_session: Session, databases: dict) -> dict:
         ),
         # Legacy tables
         Table(
-            database_id=databases[4].id,
+            db_id=databases_list[3].id,
             name="old_customer_data",
-            type="PERMANENT",
+            table_type="PERMANENT",
             status=AssetStatus.DEPRECATED,
             description="Legacy customer data (use customers_table instead)",
             created_at=datetime.utcnow() - timedelta(days=2000),
@@ -163,7 +164,7 @@ def create_sample_tables(db_session: Session, databases: dict) -> dict:
         db_session.add(table)
     db_session.commit()
 
-    return {f"{table.database_id}_{table.name}": table for table in tables}
+    return {f"{table.db_id}_{table.name}": table for table in tables}
 
 
 def create_sample_columns(db_session: Session, tables: dict) -> None:
@@ -247,12 +248,12 @@ def create_sample_columns(db_session: Session, tables: dict) -> None:
         for idx, (name, data_type, nullable, sensitive, description) in enumerate(
             columns, 1
         ):
-            column = Column(
+            column = TableColumn(
                 table_id=table.id,
                 name=name,
                 data_type=data_type,
                 nullable=nullable,
-                sensitive=sensitive,
+                sensitive_flag=sensitive,
                 description=description,
                 position=idx,
             )
@@ -263,17 +264,22 @@ def create_sample_columns(db_session: Session, tables: dict) -> None:
 
 def create_sample_views(db_session: Session, databases: dict) -> None:
     """Create sample views."""
+    databases_list = list(databases.values())
     views = [
         View(
-            database_id=databases[1].id,
+            db_id=databases_list[0].id,
             name="customer_summary_view",
+            view_type="MATERIALIZED",
+            status=AssetStatus.ACTIVE,
             description="Materialized view of customer summary metrics",
             created_at=datetime.utcnow() - timedelta(days=180),
             definition="SELECT customer_id, COUNT(*) as order_count, SUM(total_amount) as revenue FROM orders_table GROUP BY customer_id",
         ),
         View(
-            database_id=databases[1].id,
+            db_id=databases_list[0].id,
             name="daily_analytics_view",
+            view_type="STANDARD",
+            status=AssetStatus.ACTIVE,
             description="View of daily analytics metrics",
             created_at=datetime.utcnow() - timedelta(days=90),
             definition="SELECT metric_date, total_orders, total_revenue FROM analytics_summary WHERE metric_date >= CURRENT_DATE - INTERVAL '90' DAY",
@@ -294,7 +300,7 @@ def create_sample_jobs(db_session: Session) -> dict:
             frequency="DAILY",
             schedule="0 2 * * *",
             owner="data_team",
-            status="ACTIVE",
+            status=AssetStatus.ACTIVE,
             created_at=datetime.utcnow() - timedelta(days=365),
         ),
         Job(
@@ -303,7 +309,7 @@ def create_sample_jobs(db_session: Session) -> dict:
             frequency="DAILY",
             schedule="0 3 * * *",
             owner="analytics_team",
-            status="ACTIVE",
+            status=AssetStatus.ACTIVE,
             created_at=datetime.utcnow() - timedelta(days=180),
         ),
         Job(
@@ -312,7 +318,7 @@ def create_sample_jobs(db_session: Session) -> dict:
             frequency="HOURLY",
             schedule="0 * * * *",
             owner="data_quality_team",
-            status="ACTIVE",
+            status=AssetStatus.ACTIVE,
             created_at=datetime.utcnow() - timedelta(days=90),
         ),
         Job(
@@ -321,7 +327,7 @@ def create_sample_jobs(db_session: Session) -> dict:
             frequency="WEEKLY",
             schedule="0 1 * * 0",
             owner="legacy_team",
-            status="INACTIVE",
+            status=AssetStatus.INACTIVE,
             created_at=datetime.utcnow() - timedelta(days=500),
         ),
     ]
@@ -335,33 +341,34 @@ def create_sample_jobs(db_session: Session) -> dict:
 
 def create_sample_job_executions(db_session: Session, jobs: dict) -> None:
     """Create sample job executions."""
+    jobs_list = list(jobs.values())
     executions = [
         JobExecution(
-            job_id=jobs[1].id,
+            job_id=jobs_list[0].id,
             status="SUCCESS",
-            started_at=datetime.utcnow() - timedelta(hours=22),
-            completed_at=datetime.utcnow() - timedelta(hours=22, minutes=15),
+            start_time=datetime.utcnow() - timedelta(hours=22),
+            end_time=datetime.utcnow() - timedelta(hours=22, minutes=15),
             rows_processed=50000000,
         ),
         JobExecution(
-            job_id=jobs[1].id,
+            job_id=jobs_list[0].id,
             status="SUCCESS",
-            started_at=datetime.utcnow() - timedelta(hours=46),
-            completed_at=datetime.utcnow() - timedelta(hours=46, minutes=12),
+            start_time=datetime.utcnow() - timedelta(hours=46),
+            end_time=datetime.utcnow() - timedelta(hours=46, minutes=12),
             rows_processed=50000000,
         ),
         JobExecution(
-            job_id=jobs[2].id,
+            job_id=jobs_list[1].id,
             status="SUCCESS",
-            started_at=datetime.utcnow() - timedelta(hours=3),
-            completed_at=datetime.utcnow() - timedelta(hours=3, minutes=5),
+            start_time=datetime.utcnow() - timedelta(hours=3),
+            end_time=datetime.utcnow() - timedelta(hours=3, minutes=5),
             rows_processed=10000000,
         ),
         JobExecution(
-            job_id=jobs[3].id,
+            job_id=jobs_list[3].id,
             status="FAILED",
-            started_at=datetime.utcnow() - timedelta(hours=1),
-            completed_at=datetime.utcnow() - timedelta(minutes=55),
+            start_time=datetime.utcnow() - timedelta(hours=1),
+            end_time=datetime.utcnow() - timedelta(minutes=55),
             error_message="Data quality check failed: 500 null values in customer_id",
         ),
     ]
@@ -373,65 +380,67 @@ def create_sample_job_executions(db_session: Session, jobs: dict) -> None:
 
 def create_sample_lineage(db_session: Session, tables: dict) -> None:
     """Create sample lineage relationships."""
+    # Map table names to IDs
+    table_ids = {}
+    for key, table in tables.items():
+        table_ids[table.name] = table.id
+
     lineages = [
         Lineage(
+            source_id=table_ids.get("raw_events"),
             source_type="TABLE",
-            source_name="raw_events",
+            target_id=table_ids.get("analytics_summary"),
             target_type="TABLE",
-            target_name="analytics_summary",
-            relationship_type="INPUT",
-            job_id=1,
+            job_id=None,
             description="Raw events feed into analytics summary",
         ),
         Lineage(
+            source_id=table_ids.get("orders_table"),
             source_type="TABLE",
-            source_name="orders_table",
+            target_id=table_ids.get("analytics_summary"),
             target_type="TABLE",
-            target_name="analytics_summary",
-            relationship_type="INPUT",
-            job_id=1,
+            job_id=None,
             description="Orders feed into analytics",
         ),
         Lineage(
+            source_id=table_ids.get("customers_table"),
             source_type="TABLE",
-            source_name="customers_table",
-            target_type="VIEW",
-            target_name="customer_summary_view",
-            relationship_type="INPUT",
-            description="Customer data feeds into summary view",
+            target_id=table_ids.get("analytics_summary"),
+            target_type="TABLE",
+            job_id=None,
+            description="Customer data feeds into analytics",
         ),
         Lineage(
+            source_id=table_ids.get("staging_orders"),
             source_type="TABLE",
-            source_name="staging_orders",
+            target_id=table_ids.get("orders_table"),
             target_type="TABLE",
-            target_name="orders_table",
-            relationship_type="TRANSFORMATION",
-            job_id=2,
+            job_id=None,
             description="Staging orders transformed into orders table",
         ),
     ]
 
     for lineage in lineages:
-        db_session.add(lineage)
+        if lineage.source_id and lineage.target_id:
+            db_session.add(lineage)
     db_session.commit()
 
 
 def create_sample_lifecycle(db_session: Session, tables: dict) -> None:
     """Create sample asset lifecycle records."""
-    # This assumes we have database sessions for tables
-    # In a real scenario, we'd iterate through tables and create lifecycle records
     for table_key, table in tables.items():
         lifecycle = AssetLifecycle(
-            asset_id=table.id,
+            table_id=table.id,
             asset_type="TABLE",
+            created_date=table.created_at,
             status=table.status,
             owner=table.database.owner if table.database else "unknown",
-            tier=AssetTier.STANDARD if table.status == AssetStatus.ACTIVE else AssetTier.BRONZE,
-            created_at=table.created_at,
-            deprecated_at=None
+            tier=AssetTier.TIER_1
+            if table.status == AssetStatus.ACTIVE
+            else AssetTier.TIER_3,
+            decommissioned_date=None
             if table.status == AssetStatus.ACTIVE
             else datetime.utcnow() - timedelta(days=30),
-            decommissioned_at=None,
         )
         db_session.add(lifecycle)
     db_session.commit()
@@ -440,14 +449,26 @@ def create_sample_lifecycle(db_session: Session, tables: dict) -> None:
 def create_sample_usage_metrics(db_session: Session, tables: dict) -> None:
     """Create sample usage metrics."""
     for table_key, table in tables.items():
-        usage = UsageMetrics(
-            asset_id=table.id,
-            asset_type="TABLE",
-            access_count=100 if table.status == AssetStatus.ACTIVE else 5,
-            last_accessed=table.last_accessed,
-            query_count=50 if table.status == AssetStatus.ACTIVE else 0,
-            modification_count=10 if table.status == AssetStatus.ACTIVE else 0,
-        )
+        if table.status == AssetStatus.ACTIVE:
+            usage = UsageMetrics(
+                table_id=table.id,
+                last_accessed=table.last_accessed,
+                access_count_7d=20,
+                access_count_30d=80,
+                access_count_90d=150,
+                total_access_count=500,
+                average_query_time_ms=250.5,
+            )
+        else:
+            usage = UsageMetrics(
+                table_id=table.id,
+                last_accessed=table.last_accessed,
+                access_count_7d=0,
+                access_count_30d=0,
+                access_count_90d=0,
+                total_access_count=10,
+                average_query_time_ms=100.0,
+            )
         db_session.add(usage)
     db_session.commit()
 
@@ -471,7 +492,7 @@ def create_sample_tags(db_session: Session, tables: dict) -> None:
         table = tables.get(table_key)
         if table:
             tag = AssetTag(
-                asset_id=table.id,
+                table_id=table.id,
                 asset_type="TABLE",
                 tag_key=tag_key,
                 tag_value=tag_value,
@@ -482,6 +503,10 @@ def create_sample_tags(db_session: Session, tables: dict) -> None:
 
 def populate_sample_data():
     """Main function to populate all sample data."""
+    # Initialize database schema
+    print("Initializing database schema...")
+    init_db()
+
     db = SessionLocal()
 
     try:
