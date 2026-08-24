@@ -7,6 +7,7 @@ import logging
 
 from src.config import settings
 from src.catalog.database import get_session
+from src.catalog.services.sync import create_sync_service
 from src.connectors.teradata import TeradataConnector
 
 logger = logging.getLogger(__name__)
@@ -43,34 +44,60 @@ class MetadataCollector:
             logger.warning("Teradata connector not available, skipping metadata sync")
             return
 
+        db = None
         try:
             db = get_session()
             logger.info("Starting metadata sync from Teradata")
 
-            # Get all databases
-            databases = self.teradata_connector.get_databases()
-            logger.info(f"Found {len(databases)} databases")
+            # Create sync service and perform sync
+            sync_service = create_sync_service(db, self.teradata_connector)
+            stats = sync_service.sync_all_metadata()
 
-            # TODO: Implement database creation/update in catalog
+            # Log statistics
+            logger.info(
+                f"Metadata sync completed - "
+                f"Databases: {stats['databases_created']} created, {stats['databases_updated']} updated | "
+                f"Tables: {stats['tables_created']} created, {stats['tables_updated']} updated | "
+                f"Columns: {stats['columns_created']} created, {stats['columns_updated']} updated | "
+                f"Views: {stats['views_created']} created, {stats['views_updated']} updated"
+            )
 
-            db.close()
-            logger.info("Metadata sync completed successfully")
+            if stats["errors"]:
+                logger.warning(f"Sync completed with {len(stats['errors'])} errors:")
+                for error in stats["errors"]:
+                    logger.warning(f"  - {error}")
+
         except Exception as e:
-            logger.error(f"Error during metadata sync: {e}")
+            logger.error(f"Fatal error during metadata sync: {e}", exc_info=True)
+        finally:
+            if db:
+                db.close()
 
     def update_usage_stats(self) -> None:
         """Update usage statistics from query logs."""
+        db = None
         try:
+            db = get_session()
             logger.info("Starting usage statistics update")
 
-            if self.teradata_connector and self.teradata_connector.is_connected():
-                # TODO: Query logs and update usage metrics
-                logger.info("Usage statistics updated successfully")
-            else:
+            if not self.teradata_connector or not self.teradata_connector.is_connected():
                 logger.warning("Teradata connector not available for usage update")
+                return
+
+            # TODO: Implement query log parsing and usage metrics update
+            # This will:
+            # 1. Query Teradata query logs (DBC.QryLogV)
+            # 2. Parse for table access patterns
+            # 3. Update UsageMetrics with access counts
+            # 4. Update last_accessed timestamps
+
+            logger.info("Usage statistics update completed")
 
         except Exception as e:
-            logger.error(f"Error updating usage statistics: {e}")
+            logger.error(f"Error updating usage statistics: {e}", exc_info=True)
+        finally:
+            if db:
+                db.close()
 
     def start(self) -> None:
         """Start background scheduler."""

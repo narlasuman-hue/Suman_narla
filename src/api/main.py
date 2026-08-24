@@ -58,6 +58,11 @@ app.include_router(databases.router, prefix="/api/v1", tags=["Databases"])
 app.include_router(tables.router, prefix="/api/v1", tags=["Tables"])
 app.include_router(jobs.router, prefix="/api/v1", tags=["Jobs"])
 
+# Import new routers for Phase 2
+from src.api.routes import lifecycle, reports
+app.include_router(lifecycle.router, prefix="/api/v1", tags=["Lifecycle"])
+app.include_router(reports.router, prefix="/api/v1", tags=["Reports"])
+
 
 if __name__ == "__main__":
     import uvicorn
