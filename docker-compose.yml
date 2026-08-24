@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # PostgreSQL catalog database
+  postgres:
+    image: postgres:16-alpine
+    container_name: catalog-postgres
+    environment:
+      POSTGRES_DB: metadata_catalog
+      POSTGRES_USER: catalog_user
+      POSTGRES_PASSWORD: catalog_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U catalog_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # API server
+  api:
+    build: .
+    container_name: catalog-api
+    environment:
+      DATABASE_URL: postgresql://catalog_user:catalog_password@postgres:5432/metadata_catalog
+      CATALOG_DB_HOST: postgres
+      CATALOG_DB_USER: catalog_user
+      CATALOG_DB_PASSWORD: catalog_password
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/app
+    networks:
+      - catalog-network
+
+  # Optional: Elasticsearch for search (uncomment to enable)
+  # elasticsearch:
+  #   image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+  #   container_name: catalog-elasticsearch
+  #   environment:
+  #     - discovery.type=single-node
+  #     - xpack.security.enabled=false
+  #   ports:
+  #     - "9200:9200"
+  #   volumes:
+  #     - elasticsearch_data:/usr/share/elasticsearch/data
+  #   networks:
+  #     - catalog-network
+
+volumes:
+  postgres_data:
+  # elasticsearch_data:
+
+networks:
+  catalog-network:
+    driver: bridge
