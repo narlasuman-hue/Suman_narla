@@ -98,7 +98,7 @@ jobs:
           bandit -r src/ -f txt
 
       - name: Upload Bandit report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v7
         with:
           name: bandit-report
           path: bandit-report.json
