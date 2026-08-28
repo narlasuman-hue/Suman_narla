@@ -69,6 +69,10 @@ app.include_router(lineage.router, prefix="/api/v1", tags=["Lineage"])
 app.include_router(search.router, prefix="/api/v1", tags=["Search"])
 app.include_router(query_analysis.router, prefix="/api/v1", tags=["Query Analysis"])
 
+# Mainframe jobs, files, and schedules
+from src.api.routes import mainframe
+app.include_router(mainframe.router, prefix="/api/v1", tags=["Mainframe"])
+
 
 if __name__ == "__main__":
     import uvicorn

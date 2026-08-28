@@ -20,6 +20,8 @@ from src.catalog.models import (
     AssetStatus,
     AssetTier,
 )
+from src.connectors.mainframe import MockMainframeConnector
+from src.catalog.services.mainframe_sync import create_mainframe_sync_service
 
 
 def create_sample_databases(db: Session) -> dict:
@@ -501,6 +503,19 @@ def create_sample_tags(db_session: Session, tables: dict) -> None:
     db_session.commit()
 
 
+def create_sample_mainframe_jobs(db_session: Session) -> dict:
+    """Populate mainframe jobs, files, and schedules via the mock connector."""
+    connector = MockMainframeConnector()
+    connector.connect()
+    try:
+        sync_service = create_mainframe_sync_service(db_session, connector)
+        stats = sync_service.sync_all_jobs()
+    finally:
+        connector.disconnect()
+
+    return stats
+
+
 def populate_sample_data():
     """Main function to populate all sample data."""
     # Initialize database schema
@@ -540,10 +555,14 @@ def populate_sample_data():
         print("Creating sample tags...")
         create_sample_tags(db, tables)
 
+        print("Creating sample mainframe jobs...")
+        mainframe_stats = create_sample_mainframe_jobs(db)
+
         print("\n✅ Sample data populated successfully!")
         print(f"  - {len(databases)} databases")
         print(f"  - {len(tables)} tables")
         print(f"  - {len(jobs)} jobs")
+        print(f"  - {mainframe_stats['jobs_created']} mainframe jobs")
 
     except Exception as e:
         print(f"❌ Error populating sample data: {e}")

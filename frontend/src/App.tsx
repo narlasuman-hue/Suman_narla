@@ -9,6 +9,8 @@ import LineagePage from './pages/LineagePage';
 import ReportsPage from './pages/ReportsPage';
 import LifecyclePage from './pages/LifecyclePage';
 import QueryAnalysisPage from './pages/QueryAnalysisPage';
+import MainframeJobsPage from './pages/MainframeJobsPage';
+import MainframeJobDetail from './pages/MainframeJobDetail';
 import './styles/globals.css';
 
 const App: React.FC = () => {
@@ -25,6 +27,8 @@ const App: React.FC = () => {
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/lifecycle" element={<LifecyclePage />} />
           <Route path="/analysis" element={<QueryAnalysisPage />} />
+          <Route path="/mainframe" element={<MainframeJobsPage />} />
+          <Route path="/mainframe/jobs/:id" element={<MainframeJobDetail />} />
         </Routes>
       </Layout>
     </Router>
