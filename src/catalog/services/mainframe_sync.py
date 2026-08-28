@@ -5,13 +5,13 @@ Pulls jobs, their files/datasets, and scheduler schedule info from a
 ``JobFile`` catalog tables with ``source_system="MAINFRAME"``.
 """
 
+import logging
 from datetime import datetime
 from typing import Any, Dict
-import logging
 
 from sqlalchemy.orm import Session
 
-from src.catalog.models import Job, JobFile, AssetStatus
+from src.catalog.models import AssetStatus, Job, JobFile
 from src.connectors.mainframe import BaseMainframeConnector
 
 logger = logging.getLogger(__name__)
@@ -98,6 +98,8 @@ class MainframeSyncService:
         return job
 
 
-def create_mainframe_sync_service(db: Session, connector: BaseMainframeConnector) -> MainframeSyncService:
+def create_mainframe_sync_service(
+    db: Session, connector: BaseMainframeConnector
+) -> MainframeSyncService:
     """Factory for MainframeSyncService."""
     return MainframeSyncService(db, connector)

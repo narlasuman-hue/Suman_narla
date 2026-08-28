@@ -181,12 +181,12 @@ def mainframe_sync():
         stats = sync_service.sync_all_jobs()
 
         click.echo(click.style("\n✓ Synchronization completed", fg="green"))
-        click.echo(f"\nResults:")
+        click.echo("\nResults:")
         click.echo(f"  Jobs: {stats['jobs_created']} created, {stats['jobs_updated']} updated")
         click.echo(f"  Files synced: {stats['files_synced']}")
 
         if stats["errors"]:
-            click.echo(f"\n" + click.style(f"⚠ {len(stats['errors'])} errors encountered:", fg="yellow"))
+            click.echo("\n" + click.style(f"⚠ {len(stats['errors'])} errors encountered:", fg="yellow"))
             for error in stats["errors"][:5]:
                 click.echo(f"  - {error}")
 

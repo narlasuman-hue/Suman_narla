@@ -15,10 +15,10 @@ export reader for CA-7/Control-M/OPC-TWS) implements
 ``src/config.py`` without changing any other layer.
 """
 
+import logging
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
-import logging
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 

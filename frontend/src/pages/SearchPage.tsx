@@ -19,23 +19,24 @@ const SearchPage: React.FC = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   useEffect(() => {
-    if (query.length >= 2) {
-      loadSuggestions();
-    } else {
+    if (query.length < 2) {
       setSuggestions([]);
       setShowSuggestions(false);
+      return;
     }
-  }, [query]);
 
-  const loadSuggestions = async () => {
-    try {
-      const data = await autocomplete(query, 'table');
-      setSuggestions(data.slice(0, 8));
-      setShowSuggestions(true);
-    } catch (error) {
-      console.error('Failed to load suggestions', error);
-    }
-  };
+    const loadSuggestions = async () => {
+      try {
+        const data = await autocomplete(query, 'table');
+        setSuggestions(data.slice(0, 8));
+        setShowSuggestions(true);
+      } catch (error) {
+        console.error('Failed to load suggestions', error);
+      }
+    };
+
+    loadSuggestions();
+  }, [query]);
 
   const handleSearch = async (searchQuery: string) => {
     if (!searchQuery.trim()) {
