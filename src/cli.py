@@ -15,6 +15,8 @@ from src.catalog.utils import (
     decommission_asset,
 )
 from src.connectors.teradata import TeradataConnector
+from src.connectors.mainframe import MockMainframeConnector
+from src.catalog.services.mainframe_sync import create_mainframe_sync_service
 
 # Configure logging
 logging.basicConfig(
@@ -154,6 +156,39 @@ def sync(no_stats):
                 click.echo(f"  - {error}")
             if len(stats["errors"]) > 5:
                 click.echo(f"  ... and {len(stats['errors']) - 5} more")
+
+        connector.disconnect()
+        db.close()
+
+    except Exception as e:
+        click.echo(click.style(f"✗ Error: {e}", fg="red"), err=True)
+        exit(1)
+
+
+@cli.command()
+def mainframe_sync():
+    """Sync jobs, files, and schedules from the mainframe."""
+    try:
+        click.echo("Connecting to mainframe data source...")
+        connector = MockMainframeConnector()
+        connector.connect()
+        click.echo(click.style("✓ Connected", fg="green"))
+
+        db = get_session()
+
+        click.echo("\nStarting mainframe job synchronization...")
+        sync_service = create_mainframe_sync_service(db, connector)
+        stats = sync_service.sync_all_jobs()
+
+        click.echo(click.style("\n✓ Synchronization completed", fg="green"))
+        click.echo(f"\nResults:")
+        click.echo(f"  Jobs: {stats['jobs_created']} created, {stats['jobs_updated']} updated")
+        click.echo(f"  Files synced: {stats['files_synced']}")
+
+        if stats["errors"]:
+            click.echo(f"\n" + click.style(f"⚠ {len(stats['errors'])} errors encountered:", fg="yellow"))
+            for error in stats["errors"][:5]:
+                click.echo(f"  - {error}")
 
         connector.disconnect()
         db.close()
