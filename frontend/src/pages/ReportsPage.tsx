@@ -25,10 +25,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
-  LineChart,
-  Line,
 } from 'recharts';
 
 const ReportsPage: React.FC = () => {

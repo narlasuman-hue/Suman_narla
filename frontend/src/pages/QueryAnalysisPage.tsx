@@ -13,11 +13,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
 } from 'recharts';
 
 const QueryAnalysisPage: React.FC = () => {
@@ -58,8 +54,6 @@ const QueryAnalysisPage: React.FC = () => {
   if (loading) {
     return <LoadingSpinner />;
   }
-
-  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
   return (
     <div className="space-y-6">

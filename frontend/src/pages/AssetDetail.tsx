@@ -13,7 +13,6 @@ import {
   getTable,
   getTableColumns,
   getDatabase,
-  getTableUsage,
 } from '../services/api';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 
@@ -25,7 +24,6 @@ const AssetDetail: React.FC<AssetDetailProps> = ({ assetType }) => {
   const { id } = useParams<{ id: string }>();
   const [asset, setAsset] = useState<any>(null);
   const [columns, setColumns] = useState<any[]>([]);
-  const [usage, setUsage] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -41,13 +39,6 @@ const AssetDetail: React.FC<AssetDetailProps> = ({ assetType }) => {
 
           const columnsData = await getTableColumns(parseInt(id));
           setColumns(columnsData);
-
-          try {
-            const usageData = await getTableUsage(parseInt(id));
-            setUsage(usageData);
-          } catch (error) {
-            console.warn('Failed to load usage data', error);
-          }
         } else if (assetType === 'database') {
           const dbData = await getDatabase(parseInt(id));
           setAsset(dbData);

@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { FiMenu, FiX } from 'react-icons/fi';
 import Header from './Header';
 import Sidebar from './Sidebar';
 
@@ -11,7 +9,6 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const location = useLocation();
 
   return (
     <div className="flex h-screen bg-gray-100">
