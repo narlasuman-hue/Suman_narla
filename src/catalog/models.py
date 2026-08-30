@@ -127,40 +127,11 @@ class Job(Base):
     execution_timeout_seconds = Column(Integer)
     last_synced = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Source system this job originates from (TERADATA, MAINFRAME)
-    source_system = Column(String(50), default="TERADATA", index=True)
-    # Mainframe-specific fields
-    job_class = Column(String(10))  # JES job class, e.g. A, B
-    scheduler_system = Column(String(50))  # e.g. CA-7, Control-M, OPC/TWS
-    schedule_name = Column(String(100), index=True)  # Scheduler-side schedule/application name
-
     executions = relationship("JobExecution", back_populates="job", cascade="all, delete-orphan")
     lifecycle = relationship("AssetLifecycle", back_populates="job", cascade="all, delete-orphan", uselist=False)
-    files = relationship("JobFile", back_populates="job", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Job(name={self.name}, owner={self.owner})>"
-
-
-class JobFile(Base):
-    """File/dataset used by a job (DD statement for mainframe jobs)."""
-    __tablename__ = "job_files"
-
-    id = Column(Integer, primary_key=True)
-    job_id = Column(Integer, ForeignKey("jobs.id"), nullable=False, index=True)
-    dd_name = Column(String(20))  # DD statement name (mainframe) or logical file alias
-    dataset_name = Column(String(255), nullable=False)
-    disposition = Column(String(20))  # NEW, OLD, SHR, MOD, CATLG, DELETE
-    direction = Column(String(10))  # INPUT, OUTPUT, INOUT
-    dataset_type = Column(String(20))  # PS, PDS, VSAM, GDG, etc.
-    volume_serial = Column(String(20))
-    description = Column(Text)
-    last_synced = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    job = relationship("Job", back_populates="files")
-
-    def __repr__(self):
-        return f"<JobFile(job_id={self.job_id}, dataset_name={self.dataset_name})>"
 
 
 class JobExecution(Base):

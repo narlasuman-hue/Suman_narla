@@ -8,7 +8,6 @@ import {
   FiAlertCircle,
   FiClock,
   FiChevronRight,
-  FiSearch,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import {

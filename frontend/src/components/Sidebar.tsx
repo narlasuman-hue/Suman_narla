@@ -8,7 +8,6 @@ import {
   FiTrendingUp,
   FiEye,
   FiGitBranch,
-  FiServer,
 } from 'react-icons/fi';
 import clsx from 'clsx';
 
@@ -26,7 +25,6 @@ const menuItems = [
   { icon: FiBarChart2, label: 'Reports', href: '/reports' },
   { icon: FiTrendingUp, label: 'Lifecycle', href: '/lifecycle' },
   { icon: FiEye, label: 'Query Analysis', href: '/analysis' },
-  { icon: FiServer, label: 'Mainframe Jobs', href: '/mainframe' },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, isMobileOpen, onMobileClose }) => {

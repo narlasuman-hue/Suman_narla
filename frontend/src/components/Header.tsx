@@ -1,5 +1,5 @@
 import React from 'react';
-import { FiMenu, FiSearch } from 'react-icons/fi';
+import { FiMenu, FiX, FiSearch } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
 
 interface HeaderProps {
