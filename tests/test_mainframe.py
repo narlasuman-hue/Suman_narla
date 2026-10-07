@@ -19,7 +19,7 @@ def connector():
 
 def test_mock_connector_lists_jobs(connector):
     jobs = connector.get_jobs()
-    assert len(jobs) == 3
+    assert len(jobs) == 5
     assert any(j["job_name"] == "PAYRDLY1" for j in jobs)
 
 
@@ -44,12 +44,12 @@ def test_sync_creates_jobs_and_files(db, connector):
     sync_service = create_mainframe_sync_service(db, connector)
     stats = sync_service.sync_all_jobs()
 
-    assert stats["jobs_created"] == 3
+    assert stats["jobs_created"] == 5
     assert stats["jobs_updated"] == 0
     assert stats["errors"] == []
 
     jobs = db.query(Job).filter(Job.source_system == "MAINFRAME").all()
-    assert len(jobs) == 3
+    assert len(jobs) == 5
 
     payroll_job = db.query(Job).filter(Job.name == "PAYRDLY1").first()
     assert payroll_job is not None
@@ -69,9 +69,9 @@ def test_sync_is_idempotent(db, connector):
     stats = sync_service.sync_all_jobs()
     second_count = db.query(Job).filter(Job.source_system == "MAINFRAME").count()
 
-    assert first_count == second_count == 3
+    assert first_count == second_count == 5
     assert stats["jobs_created"] == 0
-    assert stats["jobs_updated"] == 3
+    assert stats["jobs_updated"] == 5
 
 
 # The shared `client` fixture runs the FastAPI app's TestClient against a
@@ -88,7 +88,7 @@ async def test_list_mainframe_jobs_route(db):
     jobs = await mainframe_routes.list_mainframe_jobs(
         db=db, status=None, schedule_name=None, skip=0, limit=50
     )
-    assert len(jobs) == 3
+    assert len(jobs) == 5
     assert all(j["schedule_name"] for j in jobs)
 
 

@@ -415,4 +415,118 @@ export const syncMainframeJobs = async () => {
   return response.data;
 };
 
+// ============ Job Lineage (Mainframe/Teradata or Hadoop/Ab Initio) ============
+
+export type LineagePlatform = 'MAINFRAME' | 'HADOOP_ABINITIO';
+export type LineageDirection = 'upstream' | 'downstream' | 'both';
+
+interface LineageNodeBase {
+  id: string;
+  name: string;
+  impacted: boolean;
+  impacted_by: string[];
+}
+
+export interface LineageJobNode extends LineageNodeBase {
+  type: 'job';
+  catalog_id: number;
+  platform: LineagePlatform;
+  platform_label: string;
+  job_type: 'JCL' | 'TERADATA_LOAD' | 'AB_INITIO_GRAPH';
+  owner?: string;
+  description?: string;
+  scheduler_system?: string;
+  schedule_name?: string;
+  frequency?: string;
+  last_run?: string;
+  next_run?: string;
+  run_status: string;
+  run_duration_seconds?: number;
+  run_error?: string;
+}
+
+export interface LineageDatasetNode extends LineageNodeBase {
+  type: 'dataset';
+  dataset_type?: string;
+  platform: 'MAINFRAME' | 'TERADATA' | 'HADOOP';
+}
+
+export type LineageNode = LineageJobNode | LineageDatasetNode;
+
+export interface LineageEdge {
+  id: string;
+  source: string;
+  target: string;
+  port?: string;
+}
+
+export interface JobLineageGraph {
+  nodes: LineageNode[];
+  edges: LineageEdge[];
+  platform: LineagePlatform;
+  focus: string | null;
+  summary: {
+    jobs: number;
+    tables_loaded: number;
+    datasets: number;
+    failed_jobs: string[];
+    running_jobs: string[];
+    impacted_jobs: number;
+  };
+}
+
+export interface JobLineageImpact {
+  node: LineageNode;
+  impacted_jobs: (LineageJobNode & { distance: number })[];
+  impacted_datasets: LineageDatasetNode[];
+  upstream_issues: (LineageJobNode & { distance: number })[];
+}
+
+export const getJobLineageGraph = async (options: {
+  platform: LineagePlatform;
+  focus?: string;
+  direction?: LineageDirection;
+  depth?: number;
+}) => {
+  const response = await apiClient.get<JobLineageGraph>('/job-lineage/graph', {
+    params: options,
+  });
+  return response.data;
+};
+
+export const getJobLineageImpact = async (platform: LineagePlatform, node: string) => {
+  const response = await apiClient.get<JobLineageImpact>('/job-lineage/impact', {
+    params: { platform, node },
+  });
+  return response.data;
+};
+
+export interface LineageJobRef {
+  id: string;
+  name: string;
+  run_status: string;
+  last_run?: string;
+}
+
+export interface LineageTableResult extends LineageDatasetNode {
+  loaded_by: LineageJobRef[];
+  read_by: LineageJobRef[];
+}
+
+export const searchJobLineageTables = async (
+  platform: LineagePlatform,
+  q: string,
+  limit: number = 50
+) => {
+  const response = await apiClient.get<LineageTableResult[]>('/job-lineage/tables', {
+    params: { platform, q, limit },
+  });
+  return response.data;
+};
+
+export const syncJobLineage = async () => {
+  const response = await apiClient.post('/job-lineage/sync');
+  return response.data;
+};
+
 export default apiClient;

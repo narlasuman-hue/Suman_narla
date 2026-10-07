@@ -119,7 +119,9 @@ class MockMainframeConnector(BaseMainframeConnector):
 
     @staticmethod
     def _build_jobs() -> Dict[str, Dict[str, Any]]:
-        now = datetime.utcnow()
+        # Truncate to the hour so repeated syncs of the mock report the same
+        # run timestamps (and don't record a "new" run on every sync).
+        now = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
         return {
             "PAYRDLY1": {
                 "job_name": "PAYRDLY1",
@@ -258,6 +260,85 @@ class MockMainframeConnector(BaseMainframeConnector):
                         "direction": "OUTPUT",
                         "dataset_type": "PS",
                         "volume_serial": "PRD023",
+                    },
+                ],
+            },
+            # Teradata load jobs: JCL that runs BTEQ / FastLoad / MultiLoad to move
+            # mainframe datasets into Teradata tables. Files with
+            # dataset_type="TERADATA" are the Teradata tables the job writes.
+            "TDGLLOAD": {
+                "job_name": "TDGLLOAD",
+                "job_id": "JOB13102",
+                "owner": "FINANCE_DW_TEAM",
+                "job_class": "T",
+                "description": (
+                    "FastLoad payroll GL extract into Teradata, then BTEQ merge to GL_POSTINGS"
+                ),
+                "status": "ACTIVE",
+                "last_run": now - timedelta(hours=9),
+                "next_run": now + timedelta(hours=15),
+                "return_code": "CC 0000",
+                "schedule": {
+                    "scheduler_system": "CA-7",
+                    "schedule_name": "PAYROLL-DAILY",
+                    "frequency": "DAILY",
+                    "run_time": "02:00",
+                    "calendar": "BANKDAY",
+                },
+                "files": [
+                    {
+                        "dd_name": "GLIN",
+                        "dataset_name": "PROD.PAYROLL.GL.EXTRACT",
+                        "disposition": "SHR",
+                        "direction": "INPUT",
+                        "dataset_type": "PS",
+                        "volume_serial": "PRD003",
+                    },
+                    {
+                        "dd_name": "TDSTG",
+                        "dataset_name": "FIN_STG.GL_EXTRACT_STG",
+                        "direction": "OUTPUT",
+                        "dataset_type": "TERADATA",
+                    },
+                    {
+                        "dd_name": "TDTGT",
+                        "dataset_name": "FINANCE_DB.GL_POSTINGS",
+                        "direction": "OUTPUT",
+                        "dataset_type": "TERADATA",
+                    },
+                ],
+            },
+            "TDINVMLD": {
+                "job_name": "TDINVMLD",
+                "job_id": "JOB13140",
+                "owner": "INVENTORY_TEAM",
+                "job_class": "T",
+                "description": "MultiLoad inventory reconciliation report into Teradata",
+                "status": "ACTIVE",
+                "last_run": now - timedelta(days=1, hours=7),
+                "next_run": now + timedelta(hours=17),
+                "return_code": "CC 0000",
+                "schedule": {
+                    "scheduler_system": "OPC/TWS",
+                    "schedule_name": "INV-NIGHTLY",
+                    "frequency": "DAILY",
+                    "run_time": "03:00",
+                    "calendar": "DAILY",
+                },
+                "files": [
+                    {
+                        "dd_name": "RECONIN",
+                        "dataset_name": "PROD.INVENTORY.RECON.REPORT",
+                        "disposition": "SHR",
+                        "direction": "INPUT",
+                        "dataset_type": "PS",
+                        "volume_serial": "PRD022",
+                    },
+                    {
+                        "dd_name": "TDTGT",
+                        "dataset_name": "INV_DB.INVENTORY_RECON",
+                        "direction": "OUTPUT",
+                        "dataset_type": "TERADATA",
                     },
                 ],
             },
