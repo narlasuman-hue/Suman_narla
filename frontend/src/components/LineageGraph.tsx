@@ -14,7 +14,7 @@ interface LineageGraphProps {
   onSelect: (id: string | null) => void;
 }
 
-const COLUMN_GAP = 250;
+const COLUMN_GAP = 210;
 const ROW_GAP = 78;
 const MAX_FIT_ZOOM = 1.1;
 const MIN_READABLE_ZOOM = 0.75;
@@ -145,12 +145,12 @@ const style: cytoscape.StylesheetJson = [
     style: {
       label: 'data(label)',
       'text-wrap': 'wrap',
-      'text-max-width': '180px',
+      'text-max-width': '156px',
       'text-overflow-wrap': 'anywhere',
       'text-valign': 'center',
       'text-halign': 'center',
       'font-size': 12,
-      width: 200,
+      width: 170,
       height: 54,
       'border-width': 2,
     },
@@ -221,7 +221,12 @@ const LineageGraph: React.FC<LineageGraphProps> = ({
       cy.center(cy.getElementById(centerId));
     }
     cyRef.current = cy;
+    // Keep cytoscape's viewport in sync when the container is resized
+    // (e.g. the details drawer opening next to it).
+    const resizeObserver = new ResizeObserver(() => cy.resize());
+    resizeObserver.observe(containerRef.current);
     return () => {
+      resizeObserver.disconnect();
       cy.destroy();
       cyRef.current = null;
     };

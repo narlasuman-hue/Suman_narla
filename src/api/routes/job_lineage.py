@@ -1,6 +1,6 @@
 """Job lineage endpoints for the mainframe/Teradata and Hadoop/Ab Initio platforms."""
 
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -39,6 +39,27 @@ async def get_job_lineage_graph(
         raise HTTPException(status_code=400, detail=str(e))
     except KeyError:
         raise HTTPException(status_code=404, detail="Lineage node not found")
+
+
+@router.get("/job-lineage/tables", response_model=List[dict])
+async def search_job_lineage_tables(
+    platform: str = Query(..., description="MAINFRAME or HADOOP_ABINITIO"),
+    q: str = Query("", max_length=200, description="Part of the table name"),
+    limit: int = Query(50, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    """
+    Search the platform's tables by name.
+
+    MAINFRAME searches Teradata tables (loaded by mainframe jobs);
+    HADOOP_ABINITIO searches Hive/HDFS tables (loaded by Ab Initio graphs).
+    Each result includes the jobs that load and read the table.
+    """
+    service = JobLineageService(db)
+    try:
+        return service.search_tables(platform, q, limit)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/job-lineage/impact", response_model=dict)

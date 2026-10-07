@@ -501,6 +501,29 @@ export const getJobLineageImpact = async (platform: LineagePlatform, node: strin
   return response.data;
 };
 
+export interface LineageJobRef {
+  id: string;
+  name: string;
+  run_status: string;
+  last_run?: string;
+}
+
+export interface LineageTableResult extends LineageDatasetNode {
+  loaded_by: LineageJobRef[];
+  read_by: LineageJobRef[];
+}
+
+export const searchJobLineageTables = async (
+  platform: LineagePlatform,
+  q: string,
+  limit: number = 50
+) => {
+  const response = await apiClient.get<LineageTableResult[]>('/job-lineage/tables', {
+    params: { platform, q, limit },
+  });
+  return response.data;
+};
+
 export const syncJobLineage = async () => {
   const response = await apiClient.post('/job-lineage/sync');
   return response.data;

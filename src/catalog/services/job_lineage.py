@@ -29,6 +29,10 @@ PLATFORM_LABELS = {
 }
 DIRECTIONS = ("upstream", "downstream", "both")
 
+# The tables each platform loads: Teradata tables for mainframe jobs,
+# Hive/HDFS tables for Ab Initio graphs.
+TABLE_PLATFORM = {"MAINFRAME": "TERADATA", "HADOOP_ABINITIO": "HADOOP"}
+
 # Where a dataset lives, by dataset_type. Anything else (PS, VSAM, GDG, PDS...)
 # is a mainframe dataset.
 _DATASET_PLATFORM = {"TERADATA": "TERADATA", "HIVE": "HADOOP", "HDFS": "HADOOP"}
@@ -217,6 +221,50 @@ class JobLineageService:
             "platform": platform,
             "focus": focus,
         }
+
+    def search_tables(
+        self, platform: str, query: str = "", limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """Find the platform's tables whose name contains ``query`` (case-insensitive).
+
+        Each result lists the jobs that load the table and the jobs that read it.
+        An empty query returns all tables, alphabetically, up to ``limit``.
+        """
+        nodes, edges = self._load(platform)
+        needle = query.strip().lower()
+        tables = [
+            n
+            for n in nodes.values()
+            if n["type"] == "dataset"
+            and n["platform"] == TABLE_PLATFORM[platform]
+            and needle in n["name"].lower()
+        ]
+        # Exact and prefix matches first, then alphabetical.
+        tables.sort(
+            key=lambda n: (
+                n["name"].lower() != needle,
+                not n["name"].lower().startswith(needle),
+                n["name"].lower(),
+            )
+        )
+
+        def job_ref(job_id: str) -> Dict[str, Any]:
+            job = nodes[job_id]
+            return {
+                "id": job["id"],
+                "name": job["name"],
+                "run_status": job["run_status"],
+                "last_run": job["last_run"],
+            }
+
+        return [
+            {
+                **table,
+                "loaded_by": [job_ref(e["source"]) for e in edges if e["target"] == table["id"]],
+                "read_by": [job_ref(e["target"]) for e in edges if e["source"] == table["id"]],
+            }
+            for table in tables[:limit]
+        ]
 
     def get_impact(self, platform: str, node_id: str) -> Dict[str, Any]:
         """Blast radius of ``node_id`` plus upstream jobs that are failing or still running.

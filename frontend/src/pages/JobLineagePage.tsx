@@ -20,10 +20,12 @@ import {
   JobLineageImpact,
   LineageDirection,
   LineagePlatform,
+  LineageTableResult,
 } from '../services/api';
 import { StatCard } from '../components/StatCard';
 import LineageGraph, { collapseToJobs } from '../components/LineageGraph';
 import LineageDetailsPanel from '../components/LineageDetailsPanel';
+import TableSearch from '../components/TableSearch';
 
 /** The two independent platforms; the user picks one and sees only its lineage. */
 const PLATFORMS: Record<
@@ -89,7 +91,6 @@ const JobLineagePage: React.FC = () => {
   const [direction, setDirection] = useState<LineageDirection>('both');
   const [depth, setDepth] = useState<number | ''>('');
   const [viewMode, setViewMode] = useState<'jobs' | 'datasets'>('jobs');
-  const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [impact, setImpact] = useState<JobLineageImpact | null>(null);
   const [impactLoading, setImpactLoading] = useState(false);
@@ -176,13 +177,10 @@ const JobLineagePage: React.FC = () => {
     }
   };
 
-  const handleSearch = (value: string) => {
-    setSearch(value);
-    const match = graph?.nodes.find((n) => n.name.toLowerCase() === value.trim().toLowerCase());
-    if (match) {
-      handleFocus(match.id);
-      setSearch('');
-    }
+  // Tables only appear as nodes in the datasets view, so switch to it.
+  const handleTableSelect = (table: LineageTableResult) => {
+    setViewMode('datasets');
+    handleFocus(table.id);
   };
 
   const handlePlatformChange = (next: LineagePlatform) => {
@@ -190,7 +188,6 @@ const JobLineagePage: React.FC = () => {
     setFocus(null);
     setSelectedId(null);
     setImpact(null);
-    setSearch('');
     setSearchParams({ platform: PLATFORMS[next].param });
   };
 
@@ -279,6 +276,7 @@ const JobLineagePage: React.FC = () => {
       )}
 
       <div className="flex flex-wrap items-center gap-3 bg-white rounded-lg shadow p-4">
+        <TableSearch platform={platform} onSelect={handleTableSelect} />
         <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm">
           {(['jobs', 'datasets'] as const).map((mode) => (
             <button
@@ -290,18 +288,6 @@ const JobLineagePage: React.FC = () => {
             </button>
           ))}
         </div>
-        <input
-          list="lineage-node-names"
-          value={search}
-          onChange={(e) => handleSearch(e.target.value)}
-          placeholder={`Find a ${platform === 'MAINFRAME' ? 'mainframe job, dataset or Teradata table' : 'Ab Initio graph or Hadoop table'}…`}
-          className={`${selectClass} flex-1 min-w-[220px]`}
-        />
-        <datalist id="lineage-node-names">
-          {(graph?.nodes || []).map((n) => (
-            <option key={n.id} value={n.name} />
-          ))}
-        </datalist>
         <select value={direction} onChange={(e) => setDirection(e.target.value as LineageDirection)} disabled={!focus} className={selectClass}>
           <option value="both">Upstream + downstream</option>
           <option value="upstream">Upstream only</option>
@@ -327,18 +313,21 @@ const JobLineagePage: React.FC = () => {
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="relative h-[640px] bg-slate-50">
-            {loading || !shown ? (
-              <div className="h-full flex items-center justify-center text-gray-500">Loading lineage…</div>
-            ) : (
-              <LineageGraph
-                nodes={shown.nodes}
-                edges={shown.edges}
-                selectedId={selectedId}
-                highlightIds={highlightIds}
-                centerId={focus}
-                onSelect={handleSelect}
-              />
-            )}
+            {/* The graph shrinks while the details drawer is open so nothing hides under it. */}
+            <div className={`absolute inset-y-0 left-0 ${selected ? 'right-0 md:right-[384px]' : 'right-0'}`}>
+              {loading || !shown ? (
+                <div className="h-full flex items-center justify-center text-gray-500">Loading lineage…</div>
+              ) : (
+                <LineageGraph
+                  nodes={shown.nodes}
+                  edges={shown.edges}
+                  selectedId={selectedId}
+                  highlightIds={highlightIds}
+                  centerId={focus}
+                  onSelect={handleSelect}
+                />
+              )}
+            </div>
             {selected && (
               <div className="absolute top-3 right-3 bottom-3 w-[360px] max-w-[calc(100%-24px)] overflow-y-auto">
                 <LineageDetailsPanel

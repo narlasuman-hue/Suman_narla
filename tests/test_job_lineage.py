@@ -194,6 +194,47 @@ def test_impact_of_abinitio_failure(synced_db):
     assert "ing_inventory_recon.mp" in [j["name"] for j in upstream["upstream_issues"]]
 
 
+def test_search_tables_mainframe_returns_teradata_tables(synced_db):
+    service = JobLineageService(synced_db)
+
+    all_tables = service.search_tables(MF)
+    assert [t["name"] for t in all_tables] == [
+        "FIN_STG.GL_EXTRACT_STG",
+        "FINANCE_DB.GL_POSTINGS",
+        "INV_DB.INVENTORY_RECON",
+    ]
+    assert all(t["dataset_type"] == "TERADATA" for t in all_tables)
+
+    (gl,) = service.search_tables(MF, "gl_post")
+    assert gl["name"] == "FINANCE_DB.GL_POSTINGS"
+    assert [j["name"] for j in gl["loaded_by"]] == ["TDGLLOAD"]
+    assert gl["loaded_by"][0]["run_status"] == "SUCCESS"
+
+
+def test_search_tables_abinitio_returns_hadoop_tables(synced_db):
+    service = JobLineageService(synced_db)
+    results = service.search_tables(AI, "GL_POSTINGS")
+
+    # Hive table and HDFS path both match; mainframe/Teradata tables never do
+    assert {t["name"] for t in results} == {
+        "fin_raw.gl_postings",
+        "/data/raw/finance/gl_postings",
+        "/data/landing/finance/gl_postings_feed",
+    }
+    hive = next(t for t in results if t["name"] == "fin_raw.gl_postings")
+    assert [j["name"] for j in hive["loaded_by"]] == ["ing_gl_postings.mp"]
+    assert [j["name"] for j in hive["read_by"]] == ["bld_fin_gl_summary.mp"]
+
+
+def test_search_tables_ranks_exact_match_first(synced_db):
+    results = JobLineageService(synced_db).search_tables(AI, "fin_raw.gl_postings")
+    assert results[0]["name"] == "fin_raw.gl_postings"
+
+
+def test_search_tables_no_match(synced_db):
+    assert JobLineageService(synced_db).search_tables(MF, "no_such_table") == []
+
+
 # ---------- routes (called directly; see note in test_mainframe.py) ----------
 
 
@@ -208,6 +249,19 @@ async def test_sync_and_graph_routes(db):
     )
     assert graph["platform"] == MF
     assert graph["nodes"] and graph["edges"]
+
+
+@pytest.mark.asyncio
+async def test_search_tables_route(db):
+    await job_lineage_routes.sync_job_lineage(db)
+    results = await job_lineage_routes.search_job_lineage_tables(
+        platform=MF, q="inventory", limit=50, db=db
+    )
+    assert [t["name"] for t in results] == ["INV_DB.INVENTORY_RECON"]
+
+    with pytest.raises(HTTPException) as exc_info:
+        await job_lineage_routes.search_job_lineage_tables(platform="NOPE", q="", limit=50, db=db)
+    assert exc_info.value.status_code == 400
 
 
 @pytest.mark.asyncio

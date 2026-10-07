@@ -10,6 +10,15 @@ The user picks one at the top of the page and sees only that platform's lineage:
 
 The selected platform is kept in the URL, so you can share a link to one platform's view.
 
+## Search table
+
+Each platform view has one **Search table** box:
+
+- **Mainframe → Teradata** searches Teradata tables. **Ab Initio → Hadoop** searches Hive tables and HDFS paths.
+- Matches appear as you type (any part of the name, case-insensitive; exact and prefix matches are listed first). Each match shows the job that **loads** the table and that job's last-run status, plus a warning if the table is impacted by an upstream failure.
+- Picking a table shows its lineage: upstream (the load job, its source files/tables and the jobs before them) and downstream (jobs that read it). It also opens the table's details.
+- Use the arrow keys and Enter to pick a match, or Esc to close the list.
+
 ## SRE features (scoped to the selected platform)
 
 - Summary cards: number of jobs or graphs, tables loaded, failed and running jobs, and how many jobs are impacted downstream
@@ -18,13 +27,14 @@ The selected platform is kept in the URL, so you can share a link to one platfor
 - **Jobs only** view (job-to-job dependencies) or **Jobs + datasets** view (shows the tables and files)
 - Click a table to see which job loads it ("Loaded by") and which jobs read it
 - Focus on any job or table, follow it upstream, downstream or both, and limit the depth
-- Search box, and a link to mainframe job details
+- Link to mainframe job details
 
 ## API
 
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/api/v1/job-lineage/graph?platform=&focus=&direction=&depth=` | One platform's nodes, edges and summary. `platform` is required: `MAINFRAME` or `HADOOP_ABINITIO`. `focus` is a node id such as `job:12` or `dataset:FINANCE_DB.GL_POSTINGS`. `direction` is `upstream`, `downstream` or `both`. `depth` counts job levels. |
+| GET | `/api/v1/job-lineage/tables?platform=&q=&limit=` | Search the platform's tables (Teradata for `MAINFRAME`, Hive/HDFS for `HADOOP_ABINITIO`) by part of the name. Each result includes `loaded_by` and `read_by` jobs with their run status. |
 | GET | `/api/v1/job-lineage/impact?platform=&node=job:12` | Downstream blast radius and upstream failing or running jobs, within the platform |
 | POST | `/api/v1/job-lineage/sync` | Syncs mainframe jobs and Ab Initio graphs into the catalog |
 
