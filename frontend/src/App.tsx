@@ -11,6 +11,7 @@ import LifecyclePage from './pages/LifecyclePage';
 import QueryAnalysisPage from './pages/QueryAnalysisPage';
 import MainframeJobsPage from './pages/MainframeJobsPage';
 import MainframeJobDetail from './pages/MainframeJobDetail';
+import JobLineagePage from './pages/JobLineagePage';
 import './styles/globals.css';
 
 const App: React.FC = () => {
@@ -29,6 +30,7 @@ const App: React.FC = () => {
           <Route path="/analysis" element={<QueryAnalysisPage />} />
           <Route path="/mainframe" element={<MainframeJobsPage />} />
           <Route path="/mainframe/jobs/:id" element={<MainframeJobDetail />} />
+          <Route path="/job-lineage" element={<JobLineagePage />} />
         </Routes>
       </Layout>
     </Router>

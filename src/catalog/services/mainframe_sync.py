@@ -12,6 +12,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from src.catalog.models import Job, JobFile, AssetStatus
+from src.catalog.services.job_runs import RUN_FAILED, RUN_SUCCESS, record_last_run
 from src.connectors.mainframe import BaseMainframeConnector
 
 logger = logging.getLogger(__name__)
@@ -89,6 +90,15 @@ class MainframeSyncService:
                 )
             )
         stats["files_synced"] += len(files)
+
+        failed = details.get("status") == "FAILED"
+        record_last_run(
+            self.db,
+            job,
+            start_time=details.get("last_run"),
+            status=RUN_FAILED if failed else RUN_SUCCESS,
+            error_message=details.get("return_code") if failed else None,
+        )
 
         if is_new:
             stats["jobs_created"] += 1

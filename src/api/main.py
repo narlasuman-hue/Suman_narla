@@ -73,6 +73,10 @@ app.include_router(query_analysis.router, prefix="/api/v1", tags=["Query Analysi
 from src.api.routes import mainframe
 app.include_router(mainframe.router, prefix="/api/v1", tags=["Mainframe"])
 
+# Cross-platform job lineage (mainframe/Teradata + Hadoop Ab Initio)
+from src.api.routes import job_lineage
+app.include_router(job_lineage.router, prefix="/api/v1", tags=["Job Lineage"])
+
 
 if __name__ == "__main__":
     import uvicorn
