@@ -71,9 +71,9 @@ def _ds(port: str, name: str, direction: str, dataset_type: str) -> Dict[str, An
 class MockAbInitioConnector(BaseAbInitioConnector):
     """Sample-data Ab Initio connector for development and demos.
 
-    The sample graphs pick up where the mock mainframe/Teradata jobs leave
-    off (e.g. they read ``FINANCE_DB.GL_POSTINGS`` loaded by the mainframe
-    job ``TDGLLOAD``), so the lineage view shows end-to-end flows.
+    Ab Initio graphs load Hadoop (Hive / HDFS) tables from feeds landed in
+    HDFS; they form their own lineage, independent of the mainframe jobs
+    that load Teradata.
     """
 
     def __init__(self):
@@ -162,11 +162,11 @@ class MockAbInitioConnector(BaseAbInitioConnector):
 
         graphs = [
             graph(
-                "ing_td_gl_postings.mp", "fin_ingest", "HADOOP_FIN_TEAM",
-                "Ingest Teradata GL postings to the Hadoop raw zone",
+                "ing_gl_postings.mp", "fin_ingest", "HADOOP_FIN_TEAM",
+                "Load the GL postings feed into the Hadoop raw zone",
                 "SUCCESS", 7, 1260, fin_daily,
                 [
-                    _ds("in0", "FINANCE_DB.GL_POSTINGS", "INPUT", "TERADATA"),
+                    _ds("in0", "/data/landing/finance/gl_postings_feed", "INPUT", "HDFS"),
                     _ds("out0", "/data/raw/finance/gl_postings", "OUTPUT", "HDFS"),
                     _ds("out1", "fin_raw.gl_postings", "OUTPUT", "HIVE"),
                 ],
@@ -182,13 +182,14 @@ class MockAbInitioConnector(BaseAbInitioConnector):
                 ],
             ),
             graph(
-                "ing_td_inventory_recon.mp", "inv_ingest", "HADOOP_SUPPLY_TEAM",
-                "Ingest Teradata inventory reconciliation to Hive",
-                "SUCCESS", 30, 600, inv_daily,
+                "ing_inventory_recon.mp", "inv_ingest", "HADOOP_SUPPLY_TEAM",
+                "Load the inventory reconciliation feed into Hive",
+                "FAILED", 30, 180, inv_daily,
                 [
-                    _ds("in0", "INV_DB.INVENTORY_RECON", "INPUT", "TERADATA"),
+                    _ds("in0", "/data/landing/inventory/recon_feed", "INPUT", "HDFS"),
                     _ds("out0", "inv_raw.inventory_recon", "OUTPUT", "HIVE"),
                 ],
+                error="Phase 1: Input file '/data/landing/inventory/recon_feed' not found",
             ),
             graph(
                 "bld_supply_chain_kpi.mp", "analytics", "HADOOP_SUPPLY_TEAM",
@@ -201,11 +202,11 @@ class MockAbInitioConnector(BaseAbInitioConnector):
                 ],
             ),
             graph(
-                "ing_mf_billing_stmts.mp", "bill_ingest", "HADOOP_BILLING_TEAM",
-                "Pull month-end billing statements (GDG) from the mainframe into HDFS",
+                "ing_billing_stmts.mp", "bill_ingest", "HADOOP_BILLING_TEAM",
+                "Load the month-end billing statements feed into HDFS",
                 "RUNNING", 1, None, bill_monthly,
                 [
-                    _ds("in0", "PROD.BILLING.STATEMENTS.GDG", "INPUT", "GDG"),
+                    _ds("in0", "/data/landing/billing/statements_feed", "INPUT", "HDFS"),
                     _ds("out0", "/data/raw/billing/statements", "OUTPUT", "HDFS"),
                 ],
             ),

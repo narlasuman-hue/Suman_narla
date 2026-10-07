@@ -1,17 +1,18 @@
-"""Cross-platform job lineage for mainframe/Teradata jobs and Hadoop Ab Initio graphs.
+"""Job lineage for two independent platforms.
 
-Builds a directed graph from the catalog's ``Job`` / ``JobFile`` rows:
+* ``MAINFRAME``: mainframe JCL jobs, which load Teradata tables
+  (BTEQ / FastLoad / MultiLoad) from mainframe datasets;
+* ``HADOOP_ABINITIO``: Ab Initio graphs, which load Hadoop (Hive / HDFS) tables.
 
-* job nodes: mainframe JCL jobs (including Teradata BTEQ/FastLoad/MultiLoad
-  load jobs) and Ab Initio graphs running on Hadoop;
-* dataset nodes: mainframe datasets, Teradata tables, HDFS paths and Hive
-  tables;
+Lineage is always built for one platform at a time from the catalog's
+``Job`` / ``JobFile`` rows:
+
+* job nodes: the platform's jobs;
+* dataset nodes: the datasets/tables those jobs read and write;
 * edges: ``dataset -> job`` for inputs and ``job -> dataset`` for outputs.
 
-Jobs on different platforms link up through datasets with the same name,
-e.g. a mainframe FastLoad job writes ``FINANCE_DB.GL_POSTINGS`` and an Ab
-Initio graph reads it. For SRE triage, every node downstream of a job whose
-latest run failed is flagged as impacted (the failure's blast radius).
+For SRE triage, every node downstream of a job whose latest run failed is
+flagged as impacted (the failure's blast radius).
 """
 
 from collections import deque
@@ -26,7 +27,6 @@ PLATFORM_LABELS = {
     "MAINFRAME": "Mainframe / Teradata",
     "HADOOP_ABINITIO": "Hadoop / Ab Initio",
 }
-LINEAGE_PLATFORMS = tuple(PLATFORM_LABELS)
 DIRECTIONS = ("upstream", "downstream", "both")
 
 # Where a dataset lives, by dataset_type. Anything else (PS, VSAM, GDG, PDS...)
@@ -75,12 +75,13 @@ class JobLineageService:
 
     # ---------- graph construction ----------
 
-    def _load(self, platform: Optional[str] = None) -> Graph:
-        platforms = (platform,) if platform else LINEAGE_PLATFORMS
+    def _load(self, platform: str) -> Graph:
+        if platform not in PLATFORM_LABELS:
+            raise ValueError(f"Unknown platform: {platform}")
         jobs = (
             self.db.query(Job)
             .options(selectinload(Job.files), selectinload(Job.executions))
-            .filter(Job.source_system.in_(platforms))
+            .filter(Job.source_system == platform)
             .order_by(Job.name)
             .all()
         )
@@ -179,23 +180,22 @@ class JobLineageService:
 
     def get_graph(
         self,
-        platform: Optional[str] = None,
+        platform: str,
         focus: Optional[str] = None,
         direction: str = "both",
         depth: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Return the lineage graph, optionally narrowed around a focus node.
+        """Return one platform's lineage graph, optionally narrowed around a focus node.
 
         ``depth`` counts job levels (a job -> dataset -> job step is one level).
-        Raises ``KeyError`` if ``focus`` is not in the graph.
+        Raises ``ValueError`` for an unknown platform/direction and ``KeyError``
+        if ``focus`` is not in the platform's graph.
         """
-        if platform is not None and platform not in PLATFORM_LABELS:
-            raise ValueError(f"Unknown platform: {platform}")
         if direction not in DIRECTIONS:
             raise ValueError(f"Unknown direction: {direction}")
 
         nodes, edges = self._load(platform)
-        summary = self._summarize(nodes)
+        summary = self._summarize(nodes, edges)
 
         if focus is not None:
             if focus not in nodes:
@@ -214,16 +214,17 @@ class JobLineageService:
             "nodes": list(nodes.values()),
             "edges": edges,
             "summary": summary,
+            "platform": platform,
             "focus": focus,
         }
 
-    def get_impact(self, node_id: str) -> Dict[str, Any]:
+    def get_impact(self, platform: str, node_id: str) -> Dict[str, Any]:
         """Blast radius of ``node_id`` plus upstream jobs that are failing or still running.
 
-        Always evaluated across all platforms, since an outage on one platform
-        typically lands on another. Raises ``KeyError`` for an unknown node.
+        Raises ``ValueError`` for an unknown platform and ``KeyError`` for a node
+        that is not in that platform's graph.
         """
-        nodes, edges = self._load()
+        nodes, edges = self._load(platform)
         if node_id not in nodes:
             raise KeyError(node_id)
 
@@ -249,20 +250,23 @@ class JobLineageService:
                 (nodes[nid] for nid in downstream if nodes[nid]["type"] == "dataset"),
                 key=lambda n: n["name"],
             ),
-            "impacted_platforms": sorted(
-                {nodes[nid]["platform"] for nid in downstream if nodes[nid]["type"] == "job"}
-            ),
             "upstream_issues": upstream_issues,
         }
 
     @staticmethod
-    def _summarize(nodes: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    def _summarize(
+        nodes: Dict[str, Dict[str, Any]], edges: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         jobs = [n for n in nodes.values() if n["type"] == "job"]
+        written = {e["target"] for e in edges}
         return {
-            "jobs_by_platform": {
-                p: sum(1 for j in jobs if j["platform"] == p) for p in LINEAGE_PLATFORMS
-            },
-            "teradata_load_jobs": sum(1 for j in jobs if j["job_type"] == "TERADATA_LOAD"),
+            "jobs": len(jobs),
+            # Teradata tables (mainframe) or Hive/HDFS tables (Ab Initio) a job loads
+            "tables_loaded": sum(
+                1
+                for nid, n in nodes.items()
+                if n["type"] == "dataset" and n["platform"] != "MAINFRAME" and nid in written
+            ),
             "datasets": sum(1 for n in nodes.values() if n["type"] == "dataset"),
             "failed_jobs": [j["name"] for j in jobs if j["run_status"] == RUN_FAILED],
             "running_jobs": [j["name"] for j in jobs if j["run_status"] == RUN_RUNNING],

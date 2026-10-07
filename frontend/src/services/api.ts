@@ -415,7 +415,7 @@ export const syncMainframeJobs = async () => {
   return response.data;
 };
 
-// ============ Job Lineage (Mainframe/Teradata + Hadoop Ab Initio) ============
+// ============ Job Lineage (Mainframe/Teradata or Hadoop/Ab Initio) ============
 
 export type LineagePlatform = 'MAINFRAME' | 'HADOOP_ABINITIO';
 export type LineageDirection = 'upstream' | 'downstream' | 'both';
@@ -463,10 +463,11 @@ export interface LineageEdge {
 export interface JobLineageGraph {
   nodes: LineageNode[];
   edges: LineageEdge[];
+  platform: LineagePlatform;
   focus: string | null;
   summary: {
-    jobs_by_platform: Record<LineagePlatform, number>;
-    teradata_load_jobs: number;
+    jobs: number;
+    tables_loaded: number;
     datasets: number;
     failed_jobs: string[];
     running_jobs: string[];
@@ -478,25 +479,24 @@ export interface JobLineageImpact {
   node: LineageNode;
   impacted_jobs: (LineageJobNode & { distance: number })[];
   impacted_datasets: LineageDatasetNode[];
-  impacted_platforms: LineagePlatform[];
   upstream_issues: (LineageJobNode & { distance: number })[];
 }
 
 export const getJobLineageGraph = async (options: {
-  platform?: LineagePlatform;
+  platform: LineagePlatform;
   focus?: string;
   direction?: LineageDirection;
   depth?: number;
-} = {}) => {
+}) => {
   const response = await apiClient.get<JobLineageGraph>('/job-lineage/graph', {
     params: options,
   });
   return response.data;
 };
 
-export const getJobLineageImpact = async (node: string) => {
+export const getJobLineageImpact = async (platform: LineagePlatform, node: string) => {
   const response = await apiClient.get<JobLineageImpact>('/job-lineage/impact', {
-    params: { node },
+    params: { platform, node },
   });
   return response.data;
 };

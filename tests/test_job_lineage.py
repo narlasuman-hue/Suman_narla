@@ -36,8 +36,8 @@ def _names(nodes) -> set:
 def test_abinitio_mock_connector_lists_graphs():
     with MockAbInitioConnector() as connector:
         graphs = connector.get_graphs()
-        assert any(g["graph_name"] == "ing_td_gl_postings.mp" for g in graphs)
-        datasets = connector.get_graph_datasets("ing_td_gl_postings.mp")
+        assert any(g["graph_name"] == "ing_gl_postings.mp" for g in graphs)
+        datasets = connector.get_graph_datasets("ing_gl_postings.mp")
         assert {"INPUT", "OUTPUT"} <= {d["direction"] for d in datasets}
 
 
@@ -84,83 +84,114 @@ def test_mainframe_sync_records_failed_run(db):
 
 # ---------- lineage graph ----------
 
+MF = "MAINFRAME"
+AI = "HADOOP_ABINITIO"
+
 
 def test_dataset_node_id_normalization():
     assert dataset_node_id(" fin_raw.gl_postings ") == "dataset:FIN_RAW.GL_POSTINGS"
     assert dataset_node_id("/data/Raw/x") == "dataset:/data/Raw/x"
 
 
-def test_graph_links_mainframe_teradata_and_hadoop(synced_db):
-    graph = JobLineageService(synced_db).get_graph()
+def test_mainframe_graph_loads_teradata_tables(synced_db):
+    graph = JobLineageService(synced_db).get_graph(MF)
     edges = {(e["source"], e["target"]) for e in graph["edges"]}
 
+    # PAYRDLY1 writes the GL extract, which TDGLLOAD FastLoads into Teradata
+    gl_extract = dataset_node_id("PROD.PAYROLL.GL.EXTRACT")
     td_table = dataset_node_id("FINANCE_DB.GL_POSTINGS")
-    # mainframe FastLoad job writes the Teradata table, Ab Initio graph reads it
+    assert (_job_id(synced_db, "PAYRDLY1"), gl_extract) in edges
+    assert (gl_extract, _job_id(synced_db, "TDGLLOAD")) in edges
     assert (_job_id(synced_db, "TDGLLOAD"), td_table) in edges
-    assert (td_table, _job_id(synced_db, "ing_td_gl_postings.mp")) in edges
-
-    summary = graph["summary"]
-    assert summary["jobs_by_platform"] == {"MAINFRAME": 5, "HADOOP_ABINITIO": 6}
-    assert summary["teradata_load_jobs"] == 2
-    assert set(summary["failed_jobs"]) == {"INVRECON", "bld_customer_360.mp"}
-    assert summary["running_jobs"] == ["ing_mf_billing_stmts.mp"]
 
     nodes = {n["id"]: n for n in graph["nodes"]}
     assert nodes[_job_id(synced_db, "TDGLLOAD")]["job_type"] == "TERADATA_LOAD"
     assert nodes[td_table]["platform"] == "TERADATA"
 
+    summary = graph["summary"]
+    assert summary["jobs"] == 5
+    assert summary["tables_loaded"] == 3  # GL_EXTRACT_STG, GL_POSTINGS, INVENTORY_RECON
+    assert summary["failed_jobs"] == ["INVRECON"]
+
+
+def test_abinitio_graph_loads_hadoop_tables(synced_db):
+    graph = JobLineageService(synced_db).get_graph(AI)
+    edges = {(e["source"], e["target"]) for e in graph["edges"]}
+    hive_table = dataset_node_id("fin_raw.gl_postings")
+    assert (_job_id(synced_db, "ing_gl_postings.mp"), hive_table) in edges
+    assert (hive_table, _job_id(synced_db, "bld_fin_gl_summary.mp")) in edges
+
+    summary = graph["summary"]
+    assert summary["jobs"] == 6
+    assert set(summary["failed_jobs"]) == {"ing_inventory_recon.mp", "bld_customer_360.mp"}
+    assert summary["running_jobs"] == ["ing_billing_stmts.mp"]
+
+
+def test_platforms_are_separate(synced_db):
+    service = JobLineageService(synced_db)
+    for platform in (MF, AI):
+        jobs = [n for n in service.get_graph(platform)["nodes"] if n["type"] == "job"]
+        assert jobs and all(j["platform"] == platform for j in jobs)
+
+    ai_dataset_platforms = {
+        n["platform"] for n in service.get_graph(AI)["nodes"] if n["type"] == "dataset"
+    }
+    assert ai_dataset_platforms == {"HADOOP"}
+
+
+def test_unknown_platform_raises(synced_db):
+    with pytest.raises(ValueError):
+        JobLineageService(synced_db).get_graph("NOPE")
+
 
 def test_failed_job_marks_downstream_impacted(synced_db):
-    graph = JobLineageService(synced_db).get_graph()
-    impacted = {n["name"] for n in graph["nodes"] if n["impacted"]}
+    service = JobLineageService(synced_db)
 
-    # INVRECON (mainframe) failure flows through Teradata into Hadoop
-    assert {"TDINVMLD", "INV_DB.INVENTORY_RECON", "ing_td_inventory_recon.mp",
-            "bld_supply_chain_kpi.mp"} <= impacted
-    # unrelated finance chain is not impacted
-    assert "TDGLLOAD" not in impacted
-    assert "INVRECON" not in impacted
+    mf_impacted = {n["name"] for n in service.get_graph(MF)["nodes"] if n["impacted"]}
+    assert {"TDINVMLD", "INV_DB.INVENTORY_RECON"} <= mf_impacted
+    assert "TDGLLOAD" not in mf_impacted
+    assert "INVRECON" not in mf_impacted
 
-
-def test_platform_filter(synced_db):
-    graph = JobLineageService(synced_db).get_graph(platform="HADOOP_ABINITIO")
-    jobs = [n for n in graph["nodes"] if n["type"] == "job"]
-    assert jobs and all(j["platform"] == "HADOOP_ABINITIO" for j in jobs)
+    ai_impacted = {n["name"] for n in service.get_graph(AI)["nodes"] if n["impacted"]}
+    assert {"inv_raw.inventory_recon", "bld_supply_chain_kpi.mp"} <= ai_impacted
+    assert "bld_fin_gl_summary.mp" not in ai_impacted
 
 
 def test_focus_upstream_with_depth(synced_db):
     service = JobLineageService(synced_db)
-    focus = _job_id(synced_db, "ing_td_gl_postings.mp")
+    focus = dataset_node_id("FINANCE_DB.GL_POSTINGS")
 
-    full = service.get_graph(focus=focus, direction="upstream")
+    full = service.get_graph(MF, focus=focus, direction="upstream")
     assert {"TDGLLOAD", "PAYRDLY1"} <= _names(full["nodes"])
-    assert "bld_fin_gl_summary.mp" not in _names(full["nodes"])
+    assert "INVRECON" not in _names(full["nodes"])
 
-    one_level = service.get_graph(focus=focus, direction="upstream", depth=1)
+    one_level = service.get_graph(MF, focus=focus, direction="upstream", depth=1)
     assert "TDGLLOAD" in _names(one_level["nodes"])
     assert "PAYRDLY1" not in _names(one_level["nodes"])
 
 
-def test_focus_unknown_node_raises(synced_db):
+def test_focus_node_from_other_platform_raises(synced_db):
     with pytest.raises(KeyError):
-        JobLineageService(synced_db).get_graph(focus="job:999999")
+        JobLineageService(synced_db).get_graph(AI, focus=_job_id(synced_db, "TDGLLOAD"))
 
 
 def test_impact_of_mainframe_failure(synced_db):
-    result = JobLineageService(synced_db).get_impact(_job_id(synced_db, "INVRECON"))
+    result = JobLineageService(synced_db).get_impact(MF, _job_id(synced_db, "INVRECON"))
 
-    impacted = [j["name"] for j in result["impacted_jobs"]]
-    assert impacted[0] == "TDINVMLD"  # nearest first
-    assert "bld_supply_chain_kpi.mp" in impacted
-    assert result["impacted_platforms"] == ["HADOOP_ABINITIO", "MAINFRAME"]
-    distance = {j["name"]: j["distance"] for j in result["impacted_jobs"]}
-    assert distance["TDINVMLD"] == 1
-    assert distance["ing_td_inventory_recon.mp"] == 2
+    assert [j["name"] for j in result["impacted_jobs"]] == ["TDINVMLD"]
+    assert result["impacted_jobs"][0]["distance"] == 1
+    assert dataset_node_id("INV_DB.INVENTORY_RECON") in {
+        d["id"] for d in result["impacted_datasets"]
+    }
 
 
-def test_impact_reports_upstream_issues(synced_db):
-    result = JobLineageService(synced_db).get_impact(_job_id(synced_db, "bld_supply_chain_kpi.mp"))
-    assert "INVRECON" in [j["name"] for j in result["upstream_issues"]]
+def test_impact_of_abinitio_failure(synced_db):
+    service = JobLineageService(synced_db)
+    result = service.get_impact(AI, _job_id(synced_db, "ing_inventory_recon.mp"))
+    assert [j["name"] for j in result["impacted_jobs"]] == ["bld_supply_chain_kpi.mp"]
+
+    upstream = service.get_impact(AI, _job_id(synced_db, "bld_supply_chain_kpi.mp"))
+    assert "ing_inventory_recon.mp" in [j["name"] for j in upstream["upstream_issues"]]
 
 
 # ---------- routes (called directly; see note in test_mainframe.py) ----------
@@ -173,8 +204,9 @@ async def test_sync_and_graph_routes(db):
     assert stats["abinitio"]["jobs_created"] == 6
 
     graph = await job_lineage_routes.get_job_lineage_graph(
-        db=db, platform=None, focus=None, direction="both", depth=None
+        db=db, platform=MF, focus=None, direction="both", depth=None
     )
+    assert graph["platform"] == MF
     assert graph["nodes"] and graph["edges"]
 
 
@@ -187,5 +219,5 @@ async def test_graph_route_errors(db):
     assert exc_info.value.status_code == 400
 
     with pytest.raises(HTTPException) as exc_info:
-        await job_lineage_routes.get_job_lineage_impact(node="job:999999", db=db)
+        await job_lineage_routes.get_job_lineage_impact(platform=MF, node="job:999999", db=db)
     assert exc_info.value.status_code == 404

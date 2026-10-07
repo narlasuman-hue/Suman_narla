@@ -1,4 +1,4 @@
-"""Cross-platform job lineage endpoints (mainframe/Teradata + Hadoop Ab Initio)."""
+"""Job lineage endpoints for the mainframe/Teradata and Hadoop/Ab Initio platforms."""
 
 from typing import Optional
 
@@ -18,15 +18,16 @@ router = APIRouter()
 @router.get("/job-lineage/graph", response_model=dict)
 async def get_job_lineage_graph(
     db: Session = Depends(get_db),
-    platform: Optional[str] = Query(None, description="MAINFRAME or HADOOP_ABINITIO"),
+    platform: str = Query(..., description="MAINFRAME or HADOOP_ABINITIO"),
     focus: Optional[str] = Query(None, description="Node id, e.g. job:12 or dataset:FIN_DB.GL"),
     direction: str = Query("both", pattern="^(upstream|downstream|both)$"),
     depth: Optional[int] = Query(None, ge=1, le=20, description="Job levels from focus"),
 ):
     """
-    Get the job/dataset lineage graph.
+    Get one platform's job/dataset lineage graph.
 
-    - **platform**: Restrict to one platform's jobs (and the datasets they touch)
+    - **platform**: MAINFRAME (mainframe jobs loading Teradata tables) or
+      HADOOP_ABINITIO (Ab Initio graphs loading Hadoop tables)
     - **focus**: Only return nodes connected to this node
     - **direction**: With focus, follow upstream, downstream, or both
     - **depth**: With focus, how many job levels to follow (default: unlimited)
@@ -42,13 +43,16 @@ async def get_job_lineage_graph(
 
 @router.get("/job-lineage/impact", response_model=dict)
 async def get_job_lineage_impact(
+    platform: str = Query(..., description="MAINFRAME or HADOOP_ABINITIO"),
     node: str = Query(..., description="Node id, e.g. job:12"),
     db: Session = Depends(get_db),
 ):
     """Downstream blast radius of a job or dataset, plus failing/running upstream jobs."""
     service = JobLineageService(db)
     try:
-        return service.get_impact(node)
+        return service.get_impact(platform, node)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except KeyError:
         raise HTTPException(status_code=404, detail="Lineage node not found")
 

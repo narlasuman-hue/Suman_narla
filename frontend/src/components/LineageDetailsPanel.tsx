@@ -90,6 +90,9 @@ const LineageDetailsPanel: React.FC<Props> = ({
 }) => {
   if (!node) return null;
 
+  // Teradata / Hadoop tables are "loaded" by jobs; mainframe datasets are written.
+  const writtenLabel =
+    node.type === 'dataset' && node.platform !== 'MAINFRAME' ? 'Loaded by' : 'Written by';
   const inputs = edges.filter((e) => e.target === node.id).map((e) => e.source);
   const outputs = edges.filter((e) => e.source === node.id).map((e) => e.target);
 
@@ -125,7 +128,7 @@ const LineageDetailsPanel: React.FC<Props> = ({
       ) : (
         <div>
           <Row label="Type">{node.dataset_type || '-'}</Row>
-          <Row label="Written by">{inputs.length} job(s)</Row>
+          <Row label={writtenLabel}>{inputs.length} job(s)</Row>
           <Row label="Read by">{outputs.length} job(s)</Row>
         </div>
       )}
@@ -181,7 +184,7 @@ const LineageDetailsPanel: React.FC<Props> = ({
                     {j.name}
                   </button>
                   <p className="text-xs text-gray-500">
-                    {j.distance} level{j.distance > 1 ? 's' : ''} down · {j.platform_label} · {j.owner || 'no owner'} ·
+                    {j.distance} level{j.distance > 1 ? 's' : ''} down · {j.owner || 'no owner'} ·
                     next run {relative(j.next_run)}
                   </p>
                 </li>
@@ -200,7 +203,7 @@ const LineageDetailsPanel: React.FC<Props> = ({
           )}
         </div>
       )}
-      <NodeLinkList title={node.type === 'job' ? 'Reads' : 'Written by'} ids={inputs} nodesById={nodesById} onSelect={onSelect} />
+      <NodeLinkList title={node.type === 'job' ? 'Reads' : writtenLabel} ids={inputs} nodesById={nodesById} onSelect={onSelect} />
       <NodeLinkList title={node.type === 'job' ? 'Writes' : 'Read by'} ids={outputs} nodesById={nodesById} onSelect={onSelect} />
 
     </div>
