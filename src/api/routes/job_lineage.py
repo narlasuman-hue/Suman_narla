@@ -9,7 +9,14 @@ from src.catalog.database import get_db
 from src.catalog.services.abinitio_sync import create_abinitio_sync_service
 from src.catalog.services.job_lineage import JobLineageService
 from src.catalog.services.mainframe_sync import create_mainframe_sync_service
+from src.config import settings
 from src.connectors.abinitio import MockAbInitioConnector
+from src.connectors.lineage_files import (
+    CsvAbInitioConnector,
+    CsvMainframeConnector,
+    LineageFileError,
+    has_lineage_files,
+)
 from src.connectors.mainframe import MockMainframeConnector
 
 router = APIRouter()
@@ -83,12 +90,26 @@ async def sync_job_lineage(db: Session = Depends(get_db)):
     """
     Sync mainframe/Teradata jobs and Hadoop Ab Initio graphs into the catalog.
 
-    Uses the mock connectors by default; swap in real ``BaseMainframeConnector``
-    and ``BaseAbInitioConnector`` implementations to sync production metadata.
+    Reads the CSV input files in ``settings.lineage_data_dir`` when they exist
+    (see docs/JOB_LINEAGE_DEMO_DATA.md), otherwise the built-in sample data.
+    Swap in real ``BaseMainframeConnector`` / ``BaseAbInitioConnector``
+    implementations to sync production metadata.
     """
-    with MockMainframeConnector() as mainframe:
-        mainframe_stats = create_mainframe_sync_service(db, mainframe).sync_all_jobs()
-    with MockAbInitioConnector() as abinitio:
-        abinitio_stats = create_abinitio_sync_service(db, abinitio).sync_all_graphs()
+    data_dir = settings.lineage_data_dir
+    if has_lineage_files(data_dir):
+        source = f"files:{data_dir}"
+        mainframe, abinitio = CsvMainframeConnector(data_dir), CsvAbInitioConnector(data_dir)
+    else:
+        source = "sample"
+        mainframe, abinitio = MockMainframeConnector(), MockAbInitioConnector()
 
-    return {"mainframe": mainframe_stats, "abinitio": abinitio_stats}
+    try:
+        with mainframe:
+            mainframe_stats = create_mainframe_sync_service(db, mainframe).sync_all_jobs()
+        with abinitio:
+            abinitio_stats = create_abinitio_sync_service(db, abinitio).sync_all_graphs()
+    except LineageFileError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Invalid lineage input file: {e}")
+
+    return {"source": source, "mainframe": mainframe_stats, "abinitio": abinitio_stats}

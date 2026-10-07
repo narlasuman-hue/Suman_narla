@@ -140,13 +140,15 @@ const JobLineagePage: React.FC = () => {
     try {
       setSyncing(true);
       const stats = await syncJobLineage();
+      const from = stats.source?.startsWith('files:') ? 'input files' : 'sample data';
       toast.success(
         `Synced ${stats.mainframe.jobs_created + stats.mainframe.jobs_updated} mainframe jobs, ` +
-          `${stats.abinitio.jobs_created + stats.abinitio.jobs_updated} Ab Initio graphs`
+          `${stats.abinitio.jobs_created + stats.abinitio.jobs_updated} Ab Initio graphs from ${from}`
       );
       await loadGraph();
-    } catch (error) {
-      toast.error('Lineage sync failed');
+    } catch (error: any) {
+      // A bad input file comes back as a 400 naming the file, line and problem.
+      toast.error(error?.response?.data?.detail || 'Lineage sync failed', { duration: 10000 });
       console.error(error);
     } finally {
       setSyncing(false);

@@ -91,13 +91,18 @@ class MainframeSyncService:
             )
         stats["files_synced"] += len(files)
 
-        failed = details.get("status") == "FAILED"
+        # Sources may report the run state directly (SUCCESS/FAILED/RUNNING);
+        # otherwise a FAILED job status means the latest run failed.
+        run_status = details.get("last_run_status") or (
+            RUN_FAILED if details.get("status") == "FAILED" else RUN_SUCCESS
+        )
         record_last_run(
             self.db,
             job,
             start_time=details.get("last_run"),
-            status=RUN_FAILED if failed else RUN_SUCCESS,
-            error_message=details.get("return_code") if failed else None,
+            status=run_status,
+            duration_seconds=details.get("duration_seconds"),
+            error_message=details.get("return_code") if run_status == RUN_FAILED else None,
         )
 
         if is_new:

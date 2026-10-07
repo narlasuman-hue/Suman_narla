@@ -42,9 +42,15 @@ Both platforms are stored in the shared `jobs` / `job_files` tables, keyed by
 `source_system` (`MAINFRAME`, `HADOOP_ABINITIO`). Each job's latest run is stored
 in `job_executions`.
 
+## Demo / no production access: CSV input files
+
+`POST /job-lineage/sync` reads four CSV files from `demo_data/lineage/` (or `LINEAGE_DATA_DIR`) when they exist.
+A ready-made demo set is included. Columns and rules are in [`JOB_LINEAGE_DEMO_DATA.md`](JOB_LINEAGE_DEMO_DATA.md).
+Without the files, the sync uses the built-in sample data.
+
 ## Connecting real sources
 
-The sync uses mock connectors with sample data until you connect real ones:
+For production, implement the connectors:
 
 - `src/connectors/mainframe.py` → implement `BaseMainframeConnector`, for example with z/OSMF REST, JCL DD parsing, or CA-7/Control-M/OPC exports. Teradata targets are files with `dataset_type="TERADATA"`.
 - `src/connectors/abinitio.py` → implement `BaseAbInitioConnector`, for example with Metadata Hub, `air` output, or Control>Center exports. Hadoop targets are datasets with `dataset_type` `HIVE` or `HDFS`.
