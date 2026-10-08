@@ -54,6 +54,22 @@ class BaseMainframeConnector(ABC):
     def get_job_schedule(self, job_name: str) -> Dict[str, Any]:
         """Get the scheduler-side schedule info for a job."""
 
+    def get_table_columns(self) -> List[Dict[str, Any]]:
+        """Optional: columns of the tables/datasets this platform uses.
+
+        Each item: ``dataset_name``, ``column_name`` and optionally
+        ``data_type`` / ``description``. Default: none.
+        """
+        return []
+
+    def get_job_column_lineage(self, job_name: str) -> List[Dict[str, Any]]:
+        """Optional: column mappings the job applies.
+
+        Each item: ``source_dataset``, ``source_column``, ``target_dataset``,
+        ``target_column`` and optionally ``transformation``. Default: none.
+        """
+        return []
+
     def __enter__(self):
         self.connect()
         return self

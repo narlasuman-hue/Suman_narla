@@ -16,12 +16,14 @@ flagged as impacted (the failure's blast radius).
 """
 
 from collections import deque
+from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from sqlalchemy.orm import Session, selectinload
 
 from src.catalog.models import Job
 from src.catalog.services.job_runs import RUN_FAILED, RUN_RUNNING
+from src.catalog.services.sla import COMPLETED_LATE, LATE, MET, SEVERITY, evaluate_sla
 
 PLATFORM_LABELS = {
     "MAINFRAME": "Mainframe / Teradata",
@@ -52,6 +54,26 @@ def dataset_node_id(dataset_name: str) -> str:
     return f"dataset:{name}"
 
 
+def database_of(dataset_name: str, dataset_type: Optional[str]) -> str:
+    """The database a dataset belongs to, for database-level lineage.
+
+    * Teradata / Hive ``DB.TABLE`` -> ``DB``
+    * HDFS ``/data/raw/cards/auth`` -> zone ``/data/raw``
+    * Mainframe DSN ``PROD.PAYROLL.GL.EXTRACT`` -> qualifiers ``PROD.PAYROLL``
+    """
+    name = dataset_name.strip()
+    if name.startswith("/"):
+        parts = [p for p in name.split("/") if p]
+        return "/" + "/".join(parts[:2])
+    kind = (dataset_type or "").upper()
+    if kind in ("TERADATA", "HIVE"):
+        database = name.split(".")[0]
+        # Teradata names are conventionally upper case, Hive lower case.
+        return database.upper() if kind == "TERADATA" else database.lower()
+    qualifiers = name.upper().split(".")
+    return ".".join(qualifiers[:2])
+
+
 def job_node_id(job_id: int) -> str:
     return f"job:{job_id}"
 
@@ -79,12 +101,14 @@ class JobLineageService:
 
     # ---------- graph construction ----------
 
-    def _load(self, platform: str) -> Graph:
+    def _load(self, platform: str, now: Optional[datetime] = None) -> Graph:
         if platform not in PLATFORM_LABELS:
             raise ValueError(f"Unknown platform: {platform}")
         jobs = (
             self.db.query(Job)
-            .options(selectinload(Job.files), selectinload(Job.executions))
+            .options(
+                selectinload(Job.files), selectinload(Job.executions), selectinload(Job.sla)
+            )
             .filter(Job.source_system == platform)
             .order_by(Job.name)
             .all()
@@ -92,6 +116,7 @@ class JobLineageService:
 
         nodes: Dict[str, Dict[str, Any]] = {}
         edges: Dict[str, Dict[str, Any]] = {}
+        slas = {}  # job node id -> (expected completion, last run start)
 
         for job in jobs:
             jid = job_node_id(job.id)
@@ -114,7 +139,10 @@ class JobLineageService:
                 "run_status": latest.status if latest else "UNKNOWN",
                 "run_duration_seconds": latest.duration_seconds if latest else None,
                 "run_error": latest.error_message if latest else None,
+                "sla": None,
             }
+            if job.sla is not None:
+                slas[jid] = (job.sla.expected_completion, job.last_run)
 
             for f in job.files:
                 did = dataset_node_id(f.dataset_name)
@@ -127,6 +155,7 @@ class JobLineageService:
                         "name": f.dataset_name.strip(),
                         "dataset_type": dataset_type,
                         "platform": _DATASET_PLATFORM.get(dataset_type or "", "MAINFRAME"),
+                        "database": database_of(f.dataset_name, dataset_type),
                     },
                 )
                 direction = (f.direction or "").upper()
@@ -136,6 +165,9 @@ class JobLineageService:
                     self._add_edge(edges, jid, did, f.dd_name)
 
         self._mark_impact(nodes, list(edges.values()))
+        # SLA status depends on impact (a blocked job is at risk), so evaluate after it.
+        for jid, (expected, last_run) in slas.items():
+            nodes[jid]["sla"] = evaluate_sla(nodes[jid], expected, last_run, now)
         return nodes, list(edges.values())
 
     @staticmethod
@@ -301,6 +333,46 @@ class JobLineageService:
             "upstream_issues": upstream_issues,
         }
 
+    def get_sla(self, platform: str, now: Optional[datetime] = None) -> Dict[str, Any]:
+        """SLA status of every job that has an expected completion time, worst first.
+
+        Each row includes ``blocked_by``: failed or still-running jobs upstream of
+        it, which is usually why a job is late or at risk.
+        """
+        nodes, edges = self._load(platform, now)
+        reverse = self._adjacency(edges, reverse=True)
+        jobs = [n for n in nodes.values() if n["type"] == "job"]
+
+        rows = []
+        for job in (j for j in jobs if j["sla"]):
+            if job["sla"]["status"] in (MET, COMPLETED_LATE):
+                rows.append({**job, "blocked_by": []})  # already completed
+                continue
+            upstream = self._reachable(job["id"], reverse)
+            blocked_by = sorted(
+                (
+                    {"id": nid, "name": nodes[nid]["name"], "run_status": nodes[nid]["run_status"]}
+                    for nid in upstream
+                    if nodes[nid]["type"] == "job"
+                    and nodes[nid]["run_status"] in (RUN_FAILED, RUN_RUNNING)
+                ),
+                key=lambda b: (upstream[b["id"]], b["name"]),
+            )
+            rows.append({**job, "blocked_by": blocked_by})
+
+        rows.sort(
+            key=lambda r: (SEVERITY[r["sla"]["status"]], -r["sla"]["late_by_minutes"], r["name"])
+        )
+        counts = {status: 0 for status in SEVERITY}
+        for r in rows:
+            counts[r["sla"]["status"]] += 1
+        return {
+            "platform": platform,
+            "jobs": rows,
+            "counts": counts,
+            "jobs_without_sla": len(jobs) - len(rows),
+        }
+
     @staticmethod
     def _summarize(
         nodes: Dict[str, Dict[str, Any]], edges: List[Dict[str, Any]]
@@ -317,6 +389,10 @@ class JobLineageService:
             ),
             "datasets": sum(1 for n in nodes.values() if n["type"] == "dataset"),
             "failed_jobs": [j["name"] for j in jobs if j["run_status"] == RUN_FAILED],
+            "sla_late": sum(
+                1 for j in jobs if j["sla"] and j["sla"]["status"] in (LATE, COMPLETED_LATE)
+            ),
+            "sla_at_risk": sum(1 for j in jobs if j["sla"] and j["sla"]["status"] == "AT_RISK"),
             "running_jobs": [j["name"] for j in jobs if j["run_status"] == RUN_RUNNING],
             "impacted_jobs": sum(1 for j in jobs if j["impacted"]),
         }

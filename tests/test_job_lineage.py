@@ -238,9 +238,16 @@ def test_search_tables_no_match(synced_db):
 # ---------- routes (called directly; see note in test_mainframe.py) ----------
 
 
+@pytest.fixture(autouse=True)
+def _use_sample_data(monkeypatch, tmp_path):
+    """Route tests here expect the built-in sample data, not demo_data/ files."""
+    monkeypatch.setattr(job_lineage_routes.settings, "lineage_data_dir", str(tmp_path / "none"))
+
+
 @pytest.mark.asyncio
 async def test_sync_and_graph_routes(db):
     stats = await job_lineage_routes.sync_job_lineage(db)
+    assert stats["source"] == "sample"
     assert stats["mainframe"]["jobs_created"] == 5
     assert stats["abinitio"]["jobs_created"] == 6
 

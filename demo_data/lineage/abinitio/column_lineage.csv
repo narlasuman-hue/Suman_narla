@@ -1,0 +1,57 @@
+graph_name,source_dataset,source_column,target_dataset,target_column,transformation
+ing_cards_auth.mp,/data/landing/cards/auth_feed,card_number,/data/raw/cards/auth,card_number,
+ing_cards_auth.mp,/data/landing/cards/auth_feed,auth_ts,/data/raw/cards/auth,auth_ts,
+ing_cards_auth.mp,/data/landing/cards/auth_feed,merchant_id,/data/raw/cards/auth,merchant_id,
+ing_cards_auth.mp,/data/landing/cards/auth_feed,amount,/data/raw/cards/auth,amount,
+ing_cards_auth.mp,/data/landing/cards/auth_feed,auth_code,/data/raw/cards/auth,auth_code,
+ing_cards_auth.mp,/data/landing/cards/auth_feed,card_number,cards_raw.auth_events,card_number,
+ing_cards_auth.mp,/data/landing/cards/auth_feed,auth_ts,cards_raw.auth_events,auth_ts,
+ing_cards_auth.mp,/data/landing/cards/auth_feed,merchant_id,cards_raw.auth_events,merchant_id,
+ing_cards_auth.mp,/data/landing/cards/auth_feed,amount,cards_raw.auth_events,amount,
+ing_cards_auth.mp,/data/landing/cards/auth_feed,auth_code,cards_raw.auth_events,auth_code,
+ing_cust_profile.mp,/data/landing/customer/profile_feed,customer_id,cust_raw.customer_profile,customer_id,
+ing_cust_profile.mp,/data/landing/customer/profile_feed,card_number,cust_raw.customer_profile,card_number,
+ing_cust_profile.mp,/data/landing/customer/profile_feed,segment,cust_raw.customer_profile,segment,
+ing_cust_profile.mp,/data/landing/customer/profile_feed,home_state,cust_raw.customer_profile,home_state,
+bld_cards_txn_enriched.mp,cards_raw.auth_events,card_number,cards_cur.txn_enriched,card_number,
+bld_cards_txn_enriched.mp,cards_raw.auth_events,merchant_id,cards_cur.txn_enriched,merchant_id,
+bld_cards_txn_enriched.mp,cards_raw.auth_events,amount,cards_cur.txn_enriched,amount,
+bld_cards_txn_enriched.mp,cust_raw.customer_profile,customer_id,cards_cur.txn_enriched,customer_id,Join on card_number
+bld_cards_txn_enriched.mp,cards_raw.auth_events,auth_ts,cards_cur.txn_enriched,txn_ts,
+bld_cards_txn_enriched.mp,ref.merchant_category,mcc,cards_cur.txn_enriched,mcc,Lookup on merchant_id
+bld_cards_txn_enriched.mp,cust_raw.customer_profile,segment,cards_cur.txn_enriched,segment,Join on card_number
+bld_fraud_features.mp,cards_cur.txn_enriched,customer_id,risk_feat.fraud_features,customer_id,
+bld_fraud_features.mp,cards_cur.txn_enriched,txn_ts,risk_feat.fraud_features,txn_ts,
+bld_fraud_features.mp,cards_cur.txn_enriched,amount,risk_feat.fraud_features,amount,
+bld_fraud_features.mp,cards_cur.txn_enriched,amount,risk_feat.fraud_features,amount_zscore,(amount - 30-day avg) / 30-day stddev per customer
+bld_fraud_features.mp,cards_cur.txn_enriched,mcc,risk_feat.fraud_features,mcc_risk,Risk weight by MCC
+score_fraud_model.mp,risk_feat.fraud_features,customer_id,risk_out.fraud_scores,customer_id,
+score_fraud_model.mp,risk_feat.fraud_features,txn_ts,risk_out.fraud_scores,txn_ts,
+score_fraud_model.mp,risk_feat.fraud_features,amount_zscore,risk_out.fraud_scores,fraud_score,Fraud model v4.2
+score_fraud_model.mp,risk_feat.fraud_features,mcc_risk,risk_out.fraud_scores,fraud_score,Fraud model v4.2
+exp_fraud_alerts.mp,risk_out.fraud_scores,customer_id,/data/outbound/risk/fraud_alerts,customer_id,
+exp_fraud_alerts.mp,risk_out.fraud_scores,txn_ts,/data/outbound/risk/fraud_alerts,txn_ts,
+exp_fraud_alerts.mp,risk_out.fraud_scores,fraud_score,/data/outbound/risk/fraud_alerts,fraud_score,Only fraud_score >= 0.9
+bld_spend_insights.mp,cards_cur.txn_enriched,customer_id,analytics.customer_spend_monthly,customer_id,
+bld_spend_insights.mp,cards_cur.txn_enriched,segment,analytics.customer_spend_monthly,segment,
+bld_spend_insights.mp,cards_cur.txn_enriched,txn_ts,analytics.customer_spend_monthly,month,"trunc(txn_ts, month)"
+bld_spend_insights.mp,cards_cur.txn_enriched,amount,analytics.customer_spend_monthly,total_spend,SUM(amount) per customer per month
+ing_web_clickstream.mp,/data/landing/web/clickstream_feed,session_cookie,web_raw.clickstream,session_cookie,
+ing_web_clickstream.mp,/data/landing/web/clickstream_feed,customer_id,web_raw.clickstream,customer_id,
+ing_web_clickstream.mp,/data/landing/web/clickstream_feed,page,web_raw.clickstream,page,
+ing_web_clickstream.mp,/data/landing/web/clickstream_feed,event_ts,web_raw.clickstream,event_ts,
+bld_digital_sessions.mp,web_raw.clickstream,session_cookie,analytics.digital_sessions,session_id,Sessionize: 30-minute inactivity gap
+bld_digital_sessions.mp,web_raw.clickstream,customer_id,analytics.digital_sessions,customer_id,
+bld_digital_sessions.mp,cust_raw.customer_profile,segment,analytics.digital_sessions,segment,Join on customer_id
+bld_digital_sessions.mp,web_raw.clickstream,event_ts,analytics.digital_sessions,session_start,MIN(event_ts) per session
+bld_digital_sessions.mp,web_raw.clickstream,page,analytics.digital_sessions,page_count,COUNT(page) per session
+ing_loan_apps.mp,/data/landing/loans/applications_feed,application_id,loans_raw.applications,application_id,
+ing_loan_apps.mp,/data/landing/loans/applications_feed,customer_id,loans_raw.applications,customer_id,
+ing_loan_apps.mp,/data/landing/loans/applications_feed,product,loans_raw.applications,product,
+ing_loan_apps.mp,/data/landing/loans/applications_feed,applied_ts,loans_raw.applications,applied_ts,
+ing_loan_apps.mp,/data/landing/loans/applications_feed,status,loans_raw.applications,status,
+bld_loan_funnel.mp,loans_raw.applications,applied_ts,analytics.loan_funnel_daily,funnel_date,DATE(applied_ts)
+bld_loan_funnel.mp,loans_raw.applications,product,analytics.loan_funnel_daily,product,
+bld_loan_funnel.mp,loans_raw.applications,application_id,analytics.loan_funnel_daily,applications,COUNT(application_id)
+bld_loan_funnel.mp,loans_raw.applications,status,analytics.loan_funnel_daily,approvals,COUNT where status = 'APPROVED'
+bld_loan_funnel.mp,analytics.digital_sessions,session_id,analytics.loan_funnel_daily,digital_share,Share of applications with a digital session the same day
