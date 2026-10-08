@@ -427,6 +427,16 @@ interface LineageNodeBase {
   impacted_by: string[];
 }
 
+export type SlaStatus = 'LATE' | 'COMPLETED_LATE' | 'AT_RISK' | 'ON_TRACK' | 'MET';
+
+export interface SlaInfo {
+  status: SlaStatus;
+  expected_completion: string;
+  completed_at?: string | null;
+  late_by_minutes: number;
+  reason: string;
+}
+
 export interface LineageJobNode extends LineageNodeBase {
   type: 'job';
   catalog_id: number;
@@ -443,12 +453,16 @@ export interface LineageJobNode extends LineageNodeBase {
   run_status: string;
   run_duration_seconds?: number;
   run_error?: string;
+  sla: SlaInfo | null;
 }
 
 export interface LineageDatasetNode extends LineageNodeBase {
   type: 'dataset';
   dataset_type?: string;
   platform: 'MAINFRAME' | 'TERADATA' | 'HADOOP';
+  database: string;
+  /** Second label line for derived views (database / column graphs). */
+  subtitle?: string;
 }
 
 export type LineageNode = LineageJobNode | LineageDatasetNode;
@@ -458,6 +472,10 @@ export interface LineageEdge {
   source: string;
   target: string;
   port?: string;
+  /** Text on the arrow, e.g. the job(s) that move data between two tables. */
+  label?: string;
+  /** Run status of the job behind the arrow, when there is one. */
+  status?: string;
 }
 
 export interface JobLineageGraph {
@@ -472,6 +490,8 @@ export interface JobLineageGraph {
     failed_jobs: string[];
     running_jobs: string[];
     impacted_jobs: number;
+    sla_late: number;
+    sla_at_risk: number;
   };
 }
 
@@ -506,6 +526,7 @@ export interface LineageJobRef {
   name: string;
   run_status: string;
   last_run?: string;
+  sla_status?: SlaStatus | null;
 }
 
 export interface LineageTableResult extends LineageDatasetNode {
@@ -520,6 +541,94 @@ export const searchJobLineageTables = async (
 ) => {
   const response = await apiClient.get<LineageTableResult[]>('/job-lineage/tables', {
     params: { platform, q, limit },
+  });
+  return response.data;
+};
+
+// ---- SLA tracking ----
+
+export interface SlaJobRow extends LineageJobNode {
+  sla: SlaInfo;
+  blocked_by: { id: string; name: string; run_status: string }[];
+}
+
+export interface JobSlaReport {
+  platform: LineagePlatform;
+  jobs: SlaJobRow[];
+  counts: Record<SlaStatus, number>;
+  jobs_without_sla: number;
+}
+
+export const getJobLineageSla = async (platform: LineagePlatform) => {
+  const response = await apiClient.get<JobSlaReport>('/job-lineage/sla', { params: { platform } });
+  return response.data;
+};
+
+// ---- Columns ----
+
+export interface LineageColumn {
+  id: string;
+  type: 'column';
+  column: string;
+  dataset_id: string;
+  dataset_name: string;
+  dataset_type?: string;
+  platform?: 'MAINFRAME' | 'TERADATA' | 'HADOOP' | null;
+  database: string;
+  data_type?: string;
+  description?: string;
+  impacted: boolean;
+  impacted_by: string[];
+  upstream_columns?: number;
+  downstream_columns?: number;
+}
+
+export interface ColumnSearchResult extends LineageColumn {
+  loaded_by: LineageJobRef[];
+  read_by: LineageJobRef[];
+}
+
+export interface ColumnLineageEdge {
+  id: string;
+  source: string;
+  target: string;
+  job_id: string;
+  job_name: string;
+  run_status: string;
+  transformation?: string | null;
+}
+
+export interface ColumnLineageGraph {
+  focus: ColumnSearchResult;
+  nodes: LineageColumn[];
+  edges: ColumnLineageEdge[];
+}
+
+export const searchJobLineageColumns = async (
+  platform: LineagePlatform,
+  q: string,
+  exact: boolean = false
+) => {
+  const response = await apiClient.get<ColumnSearchResult[]>('/job-lineage/columns', {
+    params: { platform, q, exact },
+  });
+  return response.data;
+};
+
+export const getLineageTableColumns = async (platform: LineagePlatform, dataset: string) => {
+  const response = await apiClient.get<LineageColumn[]>('/job-lineage/table-columns', {
+    params: { platform, dataset },
+  });
+  return response.data;
+};
+
+export const getColumnLineage = async (
+  platform: LineagePlatform,
+  column: string,
+  direction: LineageDirection = 'both'
+) => {
+  const response = await apiClient.get<ColumnLineageGraph>('/job-lineage/column-lineage', {
+    params: { platform, column, direction },
   });
   return response.data;
 };

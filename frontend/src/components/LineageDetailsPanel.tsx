@@ -1,8 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { FiAlertTriangle, FiCrosshair, FiExternalLink, FiX, FiZap } from 'react-icons/fi';
-import { formatDistanceToNow } from 'date-fns';
-import { JobLineageImpact, LineageEdge, LineageNode } from '../services/api';
+import { JobLineageImpact, LineageEdge, LineageNode, LineagePlatform } from '../services/api';
+import {
+  formatLate,
+  formatTime,
+  relative,
+  RunStatusBadge,
+  SlaBadge,
+} from './lineageBadges';
+import TableColumnsList from './TableColumnsList';
 
 interface Props {
   node: LineageNode | null;
@@ -14,28 +21,11 @@ interface Props {
   onShowImpact: (id: string) => void;
   onSelect: (id: string) => void;
   onClose: () => void;
+  platform: LineagePlatform;
+  /** Open column-level lineage for a column of the selected table. */
+  onColumnSelect: (columnId: string) => void;
 }
 
-/** API timestamps are naive UTC; mark them as UTC before parsing. */
-export const parseUtc = (iso?: string) =>
-  iso ? new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : `${iso}Z`) : null;
-
-const relative = (iso?: string) => {
-  const d = parseUtc(iso);
-  return d ? formatDistanceToNow(d, { addSuffix: true }) : '-';
-};
-
-const statusStyle: Record<string, string> = {
-  SUCCESS: 'bg-green-100 text-green-800',
-  FAILED: 'bg-red-100 text-red-800',
-  RUNNING: 'bg-blue-100 text-blue-800',
-};
-
-export const RunStatusBadge: React.FC<{ status: string }> = ({ status }) => (
-  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${statusStyle[status] || 'bg-gray-100 text-gray-700'}`}>
-    {status}
-  </span>
-);
 
 const jobTypeLabel: Record<string, string> = {
   JCL: 'Mainframe JCL job',
@@ -87,6 +77,8 @@ const LineageDetailsPanel: React.FC<Props> = ({
   onShowImpact,
   onSelect,
   onClose,
+  platform,
+  onColumnSelect,
 }) => {
   if (!node) return null;
 
@@ -124,10 +116,27 @@ const LineageDetailsPanel: React.FC<Props> = ({
           <Row label="Schedule">{node.schedule_name || '-'}</Row>
           <Row label="Frequency">{node.frequency || '-'}</Row>
           <Row label="Owner">{node.owner || '-'}</Row>
+          {node.sla ? (
+            <>
+              <Row label="SLA">
+                <SlaBadge status={node.sla.status} />
+                {node.sla.late_by_minutes > 0 && (
+                  <span className="ml-2 font-semibold text-red-700">
+                    {formatLate(node.sla.late_by_minutes)} late
+                  </span>
+                )}
+              </Row>
+              <Row label="Expected by">{formatTime(node.sla.expected_completion)}</Row>
+              <p className="text-xs text-gray-500 pt-1">{node.sla.reason}</p>
+            </>
+          ) : (
+            <Row label="SLA">Not tracked</Row>
+          )}
         </div>
       ) : (
         <div>
           <Row label="Type">{node.dataset_type || '-'}</Row>
+          <Row label="Database">{node.database}</Row>
           <Row label={writtenLabel}>{inputs.length} job(s)</Row>
           <Row label="Read by">{outputs.length} job(s)</Row>
         </div>
@@ -203,6 +212,10 @@ const LineageDetailsPanel: React.FC<Props> = ({
           )}
         </div>
       )}
+      {node.type === 'dataset' && (
+        <TableColumnsList platform={platform} datasetId={node.id} onColumnSelect={onColumnSelect} />
+      )}
+
       <NodeLinkList title={node.type === 'job' ? 'Reads' : writtenLabel} ids={inputs} nodesById={nodesById} onSelect={onSelect} />
       <NodeLinkList title={node.type === 'job' ? 'Writes' : 'Read by'} ids={outputs} nodesById={nodesById} onSelect={onSelect} />
 

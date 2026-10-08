@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { FiSearch, FiX } from 'react-icons/fi';
 import { LineagePlatform, LineageTableResult, searchJobLineageTables } from '../services/api';
-import { RunStatusBadge } from './LineageDetailsPanel';
+import { RunStatusBadge } from './lineageBadges';
 
 interface TableSearchProps {
   platform: LineagePlatform;

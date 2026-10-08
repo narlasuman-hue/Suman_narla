@@ -1,14 +1,14 @@
-job_name,owner,description,job_class,scheduler_system,schedule_name,frequency,last_run,last_run_status,return_code,duration_seconds,next_run
-PAYEXT01,PAYROLL_TEAM,Daily payroll extract for GL posting,A,CA-7,PAYROLL-DAILY,DAILY,-10h,SUCCESS,CC 0000,840,+14h
-TDPAYLD1,FINANCE_DW_TEAM,FastLoad payroll GL extract into Teradata staging,T,CA-7,PAYROLL-DAILY,DAILY,-9h,SUCCESS,CC 0000,420,+15h
-TDGLPST1,FINANCE_DW_TEAM,BTEQ merge of payroll staging into GL_POSTINGS,T,CA-7,PAYROLL-DAILY,DAILY,-8h,SUCCESS,CC 0000,610,+16h
-TDGLSUM1,FINANCE_DW_TEAM,BTEQ daily GL summary by cost center,T,CA-7,FIN-REPORTING,DAILY,-7h,SUCCESS,CC 0000,300,+17h
-CRDTXN01,CARDS_TEAM,Extract daily card transactions from authorization log,B,Control-M,CARDS-DAILY,DAILY,-3h,FAILED,ABEND S0C7,95,+21h
-TDCRDLD1,CARDS_DW_TEAM,MultiLoad card transactions into Teradata staging,T,Control-M,CARDS-DAILY,DAILY,-27h,SUCCESS,CC 0000,720,+30m
-TDCRDPST,CARDS_DW_TEAM,BTEQ post card transactions with customer keys,T,Control-M,CARDS-DAILY,DAILY,-26h,SUCCESS,CC 0000,560,+1h
-TDFRAUD1,RISK_DW_TEAM,BTEQ build daily fraud alert table,T,Control-M,RISK-DAILY,DAILY,-25h,SUCCESS,CC 0000,480,+2h
-CUSTEXT1,CIF_TEAM,Customer master extract from CIF,A,OPC/TWS,CIF-NIGHTLY,DAILY,-2h,SUCCESS,CC 0000,650,+22h
-TDCUSLD1,CUSTOMER_DW_TEAM,TPT load customer master into Teradata,T,OPC/TWS,CIF-NIGHTLY,DAILY,-20m,RUNNING,,,+23h
-LNSEXT01,LOANS_TEAM,Loan delinquency extract,A,CA-7,LOANS-DAILY,DAILY,-6h,SUCCESS,CC 0000,510,+18h
-TDLNSLD1,LOANS_DW_TEAM,FastLoad loan delinquency into Teradata,T,CA-7,LOANS-DAILY,DAILY,-5h,FAILED,CC 0008,140,+19h
-TDLNSRPT,RISK_DW_TEAM,BTEQ build collections work queue,T,CA-7,LOANS-DAILY,DAILY,-29h,SUCCESS,CC 0000,330,+1h
+job_name,owner,description,job_class,scheduler_system,schedule_name,frequency,last_run,last_run_status,return_code,duration_seconds,expected_completion,next_run
+PAYEXT01,PAYROLL_TEAM,Daily payroll extract for GL posting,A,CA-7,PAYROLL-DAILY,DAILY,-10h,SUCCESS,CC 0000,840,-9h,+14h
+TDPAYLD1,FINANCE_DW_TEAM,FastLoad payroll GL extract into Teradata staging,T,CA-7,PAYROLL-DAILY,DAILY,-9h,SUCCESS,CC 0000,420,-8h,+15h
+TDGLPST1,FINANCE_DW_TEAM,BTEQ merge of payroll staging into GL_POSTINGS,T,CA-7,PAYROLL-DAILY,DAILY,-8h,SUCCESS,CC 0000,610,-8h,+16h
+TDGLSUM1,FINANCE_DW_TEAM,BTEQ daily GL summary by cost center,T,CA-7,FIN-REPORTING,DAILY,-7h,SUCCESS,CC 0000,300,-6h,+17h
+CRDTXN01,CARDS_TEAM,Extract daily card transactions from authorization log,B,Control-M,CARDS-DAILY,DAILY,-3h,FAILED,ABEND S0C7,95,-2h,+21h
+TDCRDLD1,CARDS_DW_TEAM,MultiLoad card transactions into Teradata staging,T,Control-M,CARDS-DAILY,DAILY,-27h,SUCCESS,CC 0000,720,-1h,+30m
+TDCRDPST,CARDS_DW_TEAM,BTEQ post card transactions with customer keys,T,Control-M,CARDS-DAILY,DAILY,-26h,SUCCESS,CC 0000,560,+90m,+1h
+TDFRAUD1,RISK_DW_TEAM,BTEQ build daily fraud alert table,T,Control-M,RISK-DAILY,DAILY,-25h,SUCCESS,CC 0000,480,+3h,+2h
+CUSTEXT1,CIF_TEAM,Customer master extract from CIF,A,OPC/TWS,CIF-NIGHTLY,DAILY,-2h,SUCCESS,CC 0000,650,-1h,+22h
+TDCUSLD1,CUSTOMER_DW_TEAM,TPT load customer master into Teradata,T,OPC/TWS,CIF-NIGHTLY,DAILY,-20m,RUNNING,,,+15m,+23h
+LNSEXT01,LOANS_TEAM,Loan delinquency extract,A,CA-7,LOANS-DAILY,DAILY,-6h,SUCCESS,CC 0000,510,+19h,+18h
+TDLNSLD1,LOANS_DW_TEAM,FastLoad loan delinquency into Teradata,T,CA-7,LOANS-DAILY,DAILY,-5h,FAILED,CC 0008,140,-4h,+19h
+TDLNSRPT,RISK_DW_TEAM,BTEQ build collections work queue,T,CA-7,LOANS-DAILY,DAILY,-29h,SUCCESS,CC 0000,330,+2h,+1h

@@ -12,6 +12,11 @@ import logging
 from sqlalchemy.orm import Session
 
 from src.catalog.models import Job, JobFile, AssetStatus
+from src.catalog.services.job_metadata import (
+    replace_column_mappings,
+    replace_table_columns,
+    upsert_sla,
+)
 from src.catalog.services.job_runs import RUN_FAILED, RUN_SUCCESS, record_last_run
 from src.connectors.mainframe import BaseMainframeConnector
 
@@ -34,7 +39,13 @@ class MainframeSyncService:
 
     def sync_all_jobs(self) -> Dict[str, Any]:
         """Sync every job the connector knows about."""
-        stats = {"jobs_created": 0, "jobs_updated": 0, "files_synced": 0, "errors": []}
+        stats = {
+            "jobs_created": 0,
+            "jobs_updated": 0,
+            "files_synced": 0,
+            "column_mappings_synced": 0,
+            "errors": [],
+        }
 
         for summary in self.connector.get_jobs():
             job_name = summary["job_name"]
@@ -44,6 +55,9 @@ class MainframeSyncService:
                 logger.error(f"Failed to sync mainframe job {job_name}: {e}")
                 stats["errors"].append(f"{job_name}: {e}")
 
+        stats["columns_synced"] = replace_table_columns(
+            self.db, "MAINFRAME", self.connector.get_table_columns()
+        )
         self.db.commit()
         return stats
 
@@ -90,6 +104,11 @@ class MainframeSyncService:
                 )
             )
         stats["files_synced"] += len(files)
+
+        upsert_sla(self.db, job, details.get("expected_completion"))
+        stats["column_mappings_synced"] += replace_column_mappings(
+            self.db, job, self.connector.get_job_column_lineage(job_name)
+        )
 
         # Sources may report the run state directly (SUCCESS/FAILED/RUNNING);
         # otherwise a FAILED job status means the latest run failed.

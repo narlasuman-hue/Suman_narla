@@ -6,8 +6,12 @@ for demos. The files live in one directory (``settings.lineage_data_dir``)::
 
     mainframe/jobs.csv            one row per mainframe job
     mainframe/job_datasets.csv    one row per dataset/table a job reads or writes
+    mainframe/table_columns.csv   optional: columns of each dataset/table
+    mainframe/column_lineage.csv  optional: source column -> target column per job
     abinitio/graphs.csv           one row per Ab Initio graph
     abinitio/graph_datasets.csv   one row per dataset/table a graph reads or writes
+    abinitio/table_columns.csv    optional: columns of each dataset/table
+    abinitio/column_lineage.csv   optional: source column -> target column per graph
 
 See ``docs/JOB_LINEAGE_DEMO_DATA.md`` for the columns. Timestamps accept ISO
 format (``2026-10-07T01:00``) or an offset from now (``-9h``, ``+15h``,
@@ -27,11 +31,14 @@ MAINFRAME_JOBS = "mainframe/jobs.csv"
 MAINFRAME_DATASETS = "mainframe/job_datasets.csv"
 ABINITIO_GRAPHS = "abinitio/graphs.csv"
 ABINITIO_DATASETS = "abinitio/graph_datasets.csv"
+TABLE_COLUMNS = "table_columns.csv"  # under mainframe/ or abinitio/
+COLUMN_LINEAGE = "column_lineage.csv"  # under mainframe/ or abinitio/
 
 RUN_STATUSES = ("SUCCESS", "FAILED", "RUNNING")
 DIRECTIONS = ("INPUT", "OUTPUT", "INOUT")
 
 _OFFSET = re.compile(r"^([+-])(\d+)([mhd])$")
+_CLOCK = re.compile(r"^(\d{1,2}):(\d{2})$")
 _UNITS = {"m": "minutes", "h": "hours", "d": "days"}
 
 
@@ -54,6 +61,24 @@ def parse_time(value: str, now: Optional[datetime] = None) -> Optional[datetime]
         return datetime.fromisoformat(value)
     except ValueError:
         raise ValueError(f"invalid time '{value}' (use ISO like 2026-10-07T01:00, or -9h / +15h)")
+
+
+def parse_deadline(value: str, now: Optional[datetime] = None) -> Optional[datetime]:
+    """Parse an SLA expected completion: ``HH:MM`` (today, UTC), an offset or ISO."""
+    match = _CLOCK.match((value or "").strip())
+    if match:
+        hour, minute = int(match.group(1)), int(match.group(2))
+        if hour > 23 or minute > 59:
+            raise ValueError(f"invalid time '{value}' (HH:MM must be 00:00-23:59)")
+        base = now or datetime.utcnow()
+        return base.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    return parse_time(value, now)
+
+
+def _dataset_key(name: str) -> str:
+    """Same matching rule as the lineage graph: HDFS paths exact, others case-insensitive."""
+    name = name.strip()
+    return name if name.startswith("/") or "://" in name else name.upper()
 
 
 def _read_csv(path: Path, required: Sequence[str]) -> List[Dict[str, str]]:
@@ -104,6 +129,7 @@ def _load(
         try:
             last_run = parse_time(row.get("last_run", ""), now)
             next_run = parse_time(row.get("next_run", ""), now)
+            expected_completion = parse_deadline(row.get("expected_completion", ""), now)
         except ValueError as e:
             raise LineageFileError(f"{jobs_path} line {line}: {e}")
         status = _choice(
@@ -117,6 +143,7 @@ def _load(
             **row,
             "last_run": last_run,
             "next_run": next_run,
+            "expected_completion": expected_completion,
             "last_run_status": status,
             "duration_seconds": int(duration) if duration else None,
             "datasets": [],
@@ -143,6 +170,77 @@ def _load(
     return jobs
 
 
+def _load_table_columns(path: Path) -> List[Dict[str, Any]]:
+    """Optional ``table_columns.csv``; missing file -> no columns."""
+    if not path.is_file():
+        return []
+    columns, seen = [], set()
+    for line, row in enumerate(_read_csv(path, ("dataset_name", "column_name")), start=2):
+        if not row["dataset_name"] or not row["column_name"]:
+            raise LineageFileError(f"{path} line {line}: dataset_name and column_name are required")
+        key = (_dataset_key(row["dataset_name"]), row["column_name"].upper())
+        if key in seen:
+            raise LineageFileError(
+                f"{path} line {line}: duplicate column "
+                f"'{row['dataset_name']}.{row['column_name']}'"
+            )
+        seen.add(key)
+        columns.append(
+            {
+                "dataset_name": row["dataset_name"],
+                "column_name": row["column_name"],
+                "data_type": row.get("data_type") or None,
+                "description": row.get("description") or None,
+            }
+        )
+    return columns
+
+
+def _load_column_lineage(
+    path: Path, jobs: Dict[str, Dict[str, Any]], name_col: str
+) -> None:
+    """Optional ``column_lineage.csv``: attach mappings to ``jobs[name]["column_mappings"]``.
+
+    The source table must be one the job reads and the target one it writes
+    (per the datasets file), so column lineage always agrees with table lineage.
+    """
+    for job in jobs.values():
+        job["column_mappings"] = []
+    if not path.is_file():
+        return
+    required = (name_col, "source_dataset", "source_column", "target_dataset", "target_column")
+    for line, row in enumerate(_read_csv(path, required), start=2):
+        job = jobs.get(row[name_col])
+        if job is None:
+            raise LineageFileError(f"{path} line {line}: {name_col} '{row[name_col]}' is unknown")
+        missing = [c for c in required[1:] if not row[c]]
+        if missing:
+            raise LineageFileError(f"{path} line {line}: empty {', '.join(missing)}")
+        reads = {_dataset_key(d["dataset_name"]) for d in job["datasets"]
+                 if d["direction"] in ("INPUT", "INOUT")}
+        writes = {_dataset_key(d["dataset_name"]) for d in job["datasets"]
+                  if d["direction"] in ("OUTPUT", "INOUT")}
+        if _dataset_key(row["source_dataset"]) not in reads:
+            raise LineageFileError(
+                f"{path} line {line}: {row[name_col]} does not read "
+                f"'{row['source_dataset']}' (add it as INPUT in the datasets file)"
+            )
+        if _dataset_key(row["target_dataset"]) not in writes:
+            raise LineageFileError(
+                f"{path} line {line}: {row[name_col]} does not write "
+                f"'{row['target_dataset']}' (add it as OUTPUT in the datasets file)"
+            )
+        job["column_mappings"].append(
+            {
+                "source_dataset": row["source_dataset"],
+                "source_column": row["source_column"],
+                "target_dataset": row["target_dataset"],
+                "target_column": row["target_column"],
+                "transformation": row.get("transformation") or None,
+            }
+        )
+
+
 def has_lineage_files(data_dir: str) -> bool:
     """True when ``data_dir`` holds the input files (so they should be used)."""
     base = Path(data_dir)
@@ -157,6 +255,7 @@ class CsvMainframeConnector(BaseMainframeConnector):
     def __init__(self, data_dir: str):
         self.data_dir = Path(data_dir)
         self._jobs: Dict[str, Dict[str, Any]] = {}
+        self._columns: List[Dict[str, Any]] = []
         self._connected = False
 
     def connect(self) -> None:
@@ -164,6 +263,8 @@ class CsvMainframeConnector(BaseMainframeConnector):
             self.data_dir, MAINFRAME_JOBS, MAINFRAME_DATASETS, "job_name",
             self.JOB_COLUMNS, "dd_name",
         )
+        _load_column_lineage(self.data_dir / "mainframe" / COLUMN_LINEAGE, self._jobs, "job_name")
+        self._columns = _load_table_columns(self.data_dir / "mainframe" / TABLE_COLUMNS)
         self._connected = True
 
     def disconnect(self) -> None:
@@ -193,7 +294,14 @@ class CsvMainframeConnector(BaseMainframeConnector):
             "next_run": job["next_run"],
             "return_code": job.get("return_code") or None,
             "duration_seconds": job["duration_seconds"],
+            "expected_completion": job["expected_completion"],
         }
+
+    def get_table_columns(self) -> List[Dict[str, Any]]:
+        return self._columns
+
+    def get_job_column_lineage(self, job_name: str) -> List[Dict[str, Any]]:
+        return self._get(job_name)["column_mappings"]
 
     def get_job_files(self, job_name: str) -> List[Dict[str, Any]]:
         return [
@@ -218,6 +326,7 @@ class CsvAbInitioConnector(BaseAbInitioConnector):
     def __init__(self, data_dir: str):
         self.data_dir = Path(data_dir)
         self._graphs: Dict[str, Dict[str, Any]] = {}
+        self._columns: List[Dict[str, Any]] = []
         self._connected = False
 
     def connect(self) -> None:
@@ -225,6 +334,10 @@ class CsvAbInitioConnector(BaseAbInitioConnector):
             self.data_dir, ABINITIO_GRAPHS, ABINITIO_DATASETS, "graph_name",
             self.JOB_COLUMNS, "port",
         )
+        _load_column_lineage(
+            self.data_dir / "abinitio" / COLUMN_LINEAGE, self._graphs, "graph_name"
+        )
+        self._columns = _load_table_columns(self.data_dir / "abinitio" / TABLE_COLUMNS)
         self._connected = True
 
     def disconnect(self) -> None:
@@ -253,7 +366,14 @@ class CsvAbInitioConnector(BaseAbInitioConnector):
             "next_run": graph["next_run"],
             "duration_seconds": graph["duration_seconds"],
             "error_message": graph.get("error_message") or None,
+            "expected_completion": graph["expected_completion"],
         }
+
+    def get_table_columns(self) -> List[Dict[str, Any]]:
+        return self._columns
+
+    def get_graph_column_lineage(self, graph_name: str) -> List[Dict[str, Any]]:
+        return self._get(graph_name)["column_mappings"]
 
     def get_graph_datasets(self, graph_name: str) -> List[Dict[str, Any]]:
         return self._get(graph_name)["datasets"]

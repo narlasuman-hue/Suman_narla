@@ -1,12 +1,12 @@
-graph_name,project,owner,description,scheduler_system,schedule_name,frequency,last_run,last_run_status,duration_seconds,error_message,next_run
-ing_cards_auth.mp,cards_ingest,HADOOP_CARDS_TEAM,Load card authorization feed into the raw zone,Control-M,HDP-CARDS-HOURLY,HOURLY,-40m,SUCCESS,780,,+20m
-ing_cust_profile.mp,cust_ingest,HADOOP_CUSTOMER_TEAM,Load customer profile feed into Hive,Control-M,HDP-CUST-DAILY,DAILY,-4h,SUCCESS,960,,+20h
-bld_cards_txn_enriched.mp,cards_curated,HADOOP_CARDS_TEAM,Enrich card transactions with customer and merchant data,Control-M,HDP-CARDS-HOURLY,HOURLY,-2h,FAILED,1340,Phase 3: Join 'join_cust' ran out of memory on 2 partitions (max-core 512MB),+10m
-bld_fraud_features.mp,risk_features,HADOOP_RISK_TEAM,Build fraud model features from enriched transactions,Autosys,HDP-RISK-HOURLY,HOURLY,-3h,SUCCESS,620,,+15m
-score_fraud_model.mp,risk_scoring,HADOOP_RISK_TEAM,Score transactions with the fraud model,Autosys,HDP-RISK-HOURLY,HOURLY,-3h,SUCCESS,410,,+25m
-exp_fraud_alerts.mp,risk_export,HADOOP_RISK_TEAM,Export high-risk fraud alerts for case management,Autosys,HDP-RISK-HOURLY,HOURLY,-150m,SUCCESS,120,,+35m
-bld_spend_insights.mp,analytics,HADOOP_ANALYTICS_TEAM,Monthly customer spend insights,Control-M,HDP-ANALYTICS-DAILY,DAILY,-20h,SUCCESS,2100,,+4h
-ing_web_clickstream.mp,web_ingest,HADOOP_DIGITAL_TEAM,Load web clickstream feed into Hive,Control-M,HDP-WEB-HOURLY,HOURLY,-25m,RUNNING,,,+35m
-bld_digital_sessions.mp,analytics,HADOOP_DIGITAL_TEAM,Sessionize clickstream with customer profile,Control-M,HDP-ANALYTICS-DAILY,DAILY,-20h,SUCCESS,1850,,+4h
-ing_loan_apps.mp,loans_ingest,HADOOP_LOANS_TEAM,Load loan applications feed into Hive,Control-M,HDP-LOANS-DAILY,DAILY,-5h,SUCCESS,540,,+19h
-bld_loan_funnel.mp,analytics,HADOOP_LOANS_TEAM,Daily loan application funnel,Control-M,HDP-LOANS-DAILY,DAILY,-4h,FAILED,75,"Phase 1: Input 'loans_raw.applications' record format mismatch (expected 212 bytes, got 208)",+20h
+graph_name,project,owner,description,scheduler_system,schedule_name,frequency,last_run,last_run_status,duration_seconds,error_message,expected_completion,next_run
+ing_cards_auth.mp,cards_ingest,HADOOP_CARDS_TEAM,Load card authorization feed into the raw zone,Control-M,HDP-CARDS-HOURLY,HOURLY,-40m,SUCCESS,780,,-15m,+20m
+ing_cust_profile.mp,cust_ingest,HADOOP_CUSTOMER_TEAM,Load customer profile feed into Hive,Control-M,HDP-CUST-DAILY,DAILY,-4h,SUCCESS,960,,-3h,+20h
+bld_cards_txn_enriched.mp,cards_curated,HADOOP_CARDS_TEAM,Enrich card transactions with customer and merchant data,Control-M,HDP-CARDS-HOURLY,HOURLY,-2h,FAILED,1340,Phase 3: Join 'join_cust' ran out of memory on 2 partitions (max-core 512MB),-1h,+10m
+bld_fraud_features.mp,risk_features,HADOOP_RISK_TEAM,Build fraud model features from enriched transactions,Autosys,HDP-RISK-HOURLY,HOURLY,-3h,SUCCESS,620,,-30m,+15m
+score_fraud_model.mp,risk_scoring,HADOOP_RISK_TEAM,Score transactions with the fraud model,Autosys,HDP-RISK-HOURLY,HOURLY,-3h,SUCCESS,410,,+20m,+25m
+exp_fraud_alerts.mp,risk_export,HADOOP_RISK_TEAM,Export high-risk fraud alerts for case management,Autosys,HDP-RISK-HOURLY,HOURLY,-150m,SUCCESS,120,,+45m,+35m
+bld_spend_insights.mp,analytics,HADOOP_ANALYTICS_TEAM,Monthly customer spend insights,Control-M,HDP-ANALYTICS-DAILY,DAILY,-20h,SUCCESS,2100,,+5h,+4h
+ing_web_clickstream.mp,web_ingest,HADOOP_DIGITAL_TEAM,Load web clickstream feed into Hive,Control-M,HDP-WEB-HOURLY,HOURLY,-25m,RUNNING,,,+10m,+35m
+bld_digital_sessions.mp,analytics,HADOOP_DIGITAL_TEAM,Sessionize clickstream with customer profile,Control-M,HDP-ANALYTICS-DAILY,DAILY,-20h,SUCCESS,1850,,-19h,+4h
+ing_loan_apps.mp,loans_ingest,HADOOP_LOANS_TEAM,Load loan applications feed into Hive,Control-M,HDP-LOANS-DAILY,DAILY,-5h,SUCCESS,540,,+20h,+19h
+bld_loan_funnel.mp,analytics,HADOOP_LOANS_TEAM,Daily loan application funnel,Control-M,HDP-LOANS-DAILY,DAILY,-4h,FAILED,75,"Phase 1: Input 'loans_raw.applications' record format mismatch (expected 212 bytes, got 208)",-3h,+20h
