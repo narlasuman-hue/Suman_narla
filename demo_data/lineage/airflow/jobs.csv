@@ -1,0 +1,10 @@
+job_name,owner,description,scheduler_system,schedule_name,frequency,last_run,last_run_status,duration_seconds,error_message,expected_completion,next_run
+crm_ingest.sync_accounts,DATA_PLATFORM_TEAM,Sync Salesforce accounts into Snowflake,Airflow,crm_ingest,DAILY,-8h,SUCCESS,480,,-7h,+16h
+events_ingest.copy_app_events,DATA_PLATFORM_TEAM,COPY INTO app events from S3,Airflow,events_ingest,HOURLY,-35m,SUCCESS,300,,-20m,+25m
+billing_ingest.copy_invoices,DATA_PLATFORM_TEAM,COPY INTO invoices from S3,Airflow,billing_ingest,DAILY,-6h,SUCCESS,360,,-5h,+18h
+dbt_core.stg_app_events,ANALYTICS_ENG,dbt model stg_app_events,Airflow,dbt_core,HOURLY,-25m,SUCCESS,240,,-10m,+35m
+dbt_core.dim_customers,ANALYTICS_ENG,dbt model dim_customers,Airflow,dbt_core,DAILY,-7h,SUCCESS,300,,-6h,+17h
+dbt_core.fct_sessions,ANALYTICS_ENG,dbt model fct_sessions,Airflow,dbt_core,HOURLY,-12m,RUNNING,,,+5m,+48m
+dbt_finance.fct_revenue,FINANCE_ANALYTICS,dbt model fct_revenue,Airflow,dbt_finance,DAILY,-4h,FAILED,95,Database Error in model fct_revenue: Numeric value 'N/A' is not recognized,-3h,+20h
+bi_refresh.revenue_daily,FINANCE_ANALYTICS,Refresh the daily revenue mart,Airflow,bi_refresh,DAILY,-26h,SUCCESS,180,,+1h,+1h
+reverse_etl.push_revenue_to_crm,REVOPS_TEAM,Push revenue to Salesforce opportunities,Airflow,reverse_etl,DAILY,-27h,SUCCESS,240,,+2h,+2h

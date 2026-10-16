@@ -1,0 +1,39 @@
+job_name,source_dataset,source_column,target_dataset,target_column,transformation
+wf_stg_orders,/landing/pos/orders_daily.csv,ORDER_ID,STG.ORDERS_STG,ORDER_ID,
+wf_stg_orders,/landing/pos/orders_daily.csv,CUSTOMER_NO,STG.ORDERS_STG,CUSTOMER_NO,
+wf_stg_orders,/landing/pos/orders_daily.csv,PRODUCT_SKU,STG.ORDERS_STG,PRODUCT_SKU,
+wf_stg_orders,/landing/pos/orders_daily.csv,QTY,STG.ORDERS_STG,QTY,
+wf_stg_orders,/landing/pos/orders_daily.csv,UNIT_PRICE,STG.ORDERS_STG,UNIT_PRICE,
+wf_stg_orders,/landing/pos/orders_daily.csv,ORDER_TS,STG.ORDERS_STG,ORDER_DATE,"TO_DATE(SUBSTR(ORDER_TS,1,10),'YYYY-MM-DD')"
+wf_stg_customers,CRM.CUSTOMERS,CUST_NO,STG.CUSTOMERS_STG,CUSTOMER_NO,
+wf_stg_customers,CRM.CUSTOMERS,FIRST_NAME,STG.CUSTOMERS_STG,CUSTOMER_NAME,FIRST_NAME || ' ' || LAST_NAME
+wf_stg_customers,CRM.CUSTOMERS,LAST_NAME,STG.CUSTOMERS_STG,CUSTOMER_NAME,FIRST_NAME || ' ' || LAST_NAME
+wf_stg_customers,CRM.CUSTOMERS,EMAIL,STG.CUSTOMERS_STG,EMAIL,LOWER(EMAIL)
+wf_stg_customers,CRM.CUSTOMERS,REGION_CD,STG.CUSTOMERS_STG,REGION,Lookup region name by REGION_CD
+wf_dim_customer,STG.CUSTOMERS_STG,CUSTOMER_NO,DW.DIM_CUSTOMER,CUSTOMER_NO,
+wf_dim_customer,STG.CUSTOMERS_STG,CUSTOMER_NAME,DW.DIM_CUSTOMER,CUSTOMER_NAME,
+wf_dim_customer,STG.CUSTOMERS_STG,REGION,DW.DIM_CUSTOMER,REGION,
+wf_dim_customer,STG.CUSTOMERS_STG,CUSTOMER_NO,DW.DIM_CUSTOMER,CUSTOMER_KEY,"Sequence generator, keyed on CUSTOMER_NO"
+wf_dim_product,/landing/pim/products.xml,SKU,DW.DIM_PRODUCT,PRODUCT_SKU,
+wf_dim_product,/landing/pim/products.xml,SKU,DW.DIM_PRODUCT,PRODUCT_KEY,"Sequence generator, keyed on SKU"
+wf_dim_product,/landing/pim/products.xml,PRODUCT_NAME,DW.DIM_PRODUCT,PRODUCT_NAME,
+wf_dim_product,/landing/pim/products.xml,CATEGORY,DW.DIM_PRODUCT,CATEGORY,
+wf_fact_sales,STG.ORDERS_STG,ORDER_ID,DW.FACT_SALES,SALES_KEY,
+wf_fact_sales,DW.DIM_CUSTOMER,CUSTOMER_KEY,DW.FACT_SALES,CUSTOMER_KEY,Lookup on CUSTOMER_NO
+wf_fact_sales,DW.DIM_PRODUCT,PRODUCT_KEY,DW.FACT_SALES,PRODUCT_KEY,Lookup on PRODUCT_SKU
+wf_fact_sales,STG.ORDERS_STG,ORDER_DATE,DW.FACT_SALES,ORDER_DATE,
+wf_fact_sales,STG.ORDERS_STG,QTY,DW.FACT_SALES,QTY,
+wf_fact_sales,STG.ORDERS_STG,QTY,DW.FACT_SALES,SALES_AMOUNT,QTY * UNIT_PRICE
+wf_fact_sales,STG.ORDERS_STG,UNIT_PRICE,DW.FACT_SALES,SALES_AMOUNT,QTY * UNIT_PRICE
+wf_agg_daily_sales,DW.FACT_SALES,ORDER_DATE,MART.DAILY_SALES_AGG,SALES_DATE,
+wf_agg_daily_sales,DW.DIM_CUSTOMER,REGION,MART.DAILY_SALES_AGG,REGION,Join on CUSTOMER_KEY
+wf_agg_daily_sales,DW.DIM_PRODUCT,CATEGORY,MART.DAILY_SALES_AGG,CATEGORY,Join on PRODUCT_KEY
+wf_agg_daily_sales,DW.FACT_SALES,SALES_AMOUNT,MART.DAILY_SALES_AGG,TOTAL_SALES,SUM(SALES_AMOUNT)
+wf_agg_daily_sales,DW.FACT_SALES,SALES_KEY,MART.DAILY_SALES_AGG,ORDER_COUNT,COUNT(SALES_KEY)
+wf_exp_finance_feed,MART.DAILY_SALES_AGG,SALES_DATE,/outbound/finance/daily_sales.dat,SALES_DATE,
+wf_exp_finance_feed,MART.DAILY_SALES_AGG,REGION,/outbound/finance/daily_sales.dat,REGION,
+wf_exp_finance_feed,MART.DAILY_SALES_AGG,TOTAL_SALES,/outbound/finance/daily_sales.dat,TOTAL_SALES,SUM over CATEGORY
+wf_stg_returns,/landing/pos/returns_daily.csv,RETURN_ID,STG.RETURNS_STG,RETURN_ID,
+wf_stg_returns,/landing/pos/returns_daily.csv,ORDER_ID,STG.RETURNS_STG,ORDER_ID,
+wf_stg_returns,/landing/pos/returns_daily.csv,RETURN_TS,STG.RETURNS_STG,RETURN_DATE,"TO_DATE(SUBSTR(RETURN_TS,1,10))"
+wf_stg_returns,/landing/pos/returns_daily.csv,AMOUNT,STG.RETURNS_STG,RETURN_AMOUNT,TO_NUMBER(AMOUNT)

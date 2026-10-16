@@ -1,0 +1,9 @@
+job_name,owner,description,scheduler_system,schedule_name,frequency,last_run,last_run_status,duration_seconds,error_message,expected_completion,next_run
+wf_stg_orders,RETAIL_ETL_TEAM,Stage daily POS orders,Control-M,RETAIL-DAILY,DAILY,-5h,SUCCESS,600,,-4h,+19h
+wf_stg_customers,RETAIL_ETL_TEAM,Stage customers from the CRM,Control-M,RETAIL-DAILY,DAILY,-5h,SUCCESS,420,,-4h,+19h
+wf_dim_product,RETAIL_ETL_TEAM,Load product dimension from PIM,Control-M,RETAIL-DAILY,DAILY,-6h,SUCCESS,300,,-5h,+18h
+wf_dim_customer,RETAIL_DW_TEAM,Load customer dimension (SCD type 1),Control-M,RETAIL-DAILY,DAILY,-4h,SUCCESS,900,,-4h,+20h
+wf_fact_sales,RETAIL_DW_TEAM,Load sales fact,Control-M,RETAIL-DAILY,DAILY,-3h,FAILED,410,ORA-01652: unable to extend temp segment by 128 in tablespace TEMP,-2h,+21h
+wf_agg_daily_sales,RETAIL_DW_TEAM,Aggregate daily sales by region and category,Control-M,RETAIL-DAILY,DAILY,-26h,SUCCESS,540,,+1h,+2h
+wf_exp_finance_feed,FINANCE_INTEGRATION,Export daily sales to finance,Control-M,FIN-FEEDS,DAILY,-25h,SUCCESS,120,,+3h,+3h
+wf_stg_returns,RETAIL_ETL_TEAM,Stage POS returns,Control-M,RETAIL-DAILY,DAILY,-15m,RUNNING,,,+20m,+23h

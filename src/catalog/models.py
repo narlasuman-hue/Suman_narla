@@ -137,6 +137,10 @@ class Job(Base):
     executions = relationship("JobExecution", back_populates="job", cascade="all, delete-orphan")
     lifecycle = relationship("AssetLifecycle", back_populates="job", cascade="all, delete-orphan", uselist=False)
     files = relationship("JobFile", back_populates="job", cascade="all, delete-orphan")
+    sla = relationship("JobSla", back_populates="job", cascade="all, delete-orphan", uselist=False)
+    column_mappings = relationship(
+        "ColumnLineage", back_populates="job", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<Job(name={self.name}, owner={self.owner})>"
@@ -161,6 +165,58 @@ class JobFile(Base):
 
     def __repr__(self):
         return f"<JobFile(job_id={self.job_id}, dataset_name={self.dataset_name})>"
+
+
+class JobSla(Base):
+    """Expected completion time (SLA) for a job's current run."""
+    __tablename__ = "job_sla"
+
+    id = Column(Integer, primary_key=True)
+    job_id = Column(Integer, ForeignKey("jobs.id"), nullable=False, unique=True)
+    expected_completion = Column(DateTime, nullable=False)
+    last_synced = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    job = relationship("Job", back_populates="sla")
+
+    def __repr__(self):
+        return f"<JobSla(job_id={self.job_id}, expected_completion={self.expected_completion})>"
+
+
+class DatasetColumn(Base):
+    """A column of a dataset/table used by mainframe jobs or Ab Initio graphs."""
+    __tablename__ = "dataset_columns"
+
+    id = Column(Integer, primary_key=True)
+    source_system = Column(String(50), nullable=False, index=True)  # MAINFRAME, HADOOP_ABINITIO
+    dataset_name = Column(String(255), nullable=False, index=True)
+    column_name = Column(String(255), nullable=False, index=True)
+    data_type = Column(String(100))
+    description = Column(Text)
+    position = Column(Integer)
+
+    def __repr__(self):
+        return f"<DatasetColumn({self.dataset_name}.{self.column_name})>"
+
+
+class ColumnLineage(Base):
+    """Column-level mapping a job applies: source column -> target column."""
+    __tablename__ = "column_lineage"
+
+    id = Column(Integer, primary_key=True)
+    job_id = Column(Integer, ForeignKey("jobs.id"), nullable=False, index=True)
+    source_dataset = Column(String(255), nullable=False)
+    source_column = Column(String(255), nullable=False)
+    target_dataset = Column(String(255), nullable=False)
+    target_column = Column(String(255), nullable=False)
+    transformation = Column(Text)
+
+    job = relationship("Job", back_populates="column_mappings")
+
+    def __repr__(self):
+        return (
+            f"<ColumnLineage({self.source_dataset}.{self.source_column} -> "
+            f"{self.target_dataset}.{self.target_column})>"
+        )
 
 
 class JobExecution(Base):

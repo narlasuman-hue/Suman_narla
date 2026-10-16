@@ -12,6 +12,11 @@ from typing import Any, Dict
 from sqlalchemy.orm import Session
 
 from src.catalog.models import AssetStatus, Job, JobFile
+from src.catalog.services.job_metadata import (
+    replace_column_mappings,
+    replace_table_columns,
+    upsert_sla,
+)
 from src.catalog.services.job_runs import record_last_run
 from src.connectors.abinitio import BaseAbInitioConnector
 
@@ -29,7 +34,13 @@ class AbInitioSyncService:
 
     def sync_all_graphs(self) -> Dict[str, Any]:
         """Sync every graph the connector knows about."""
-        stats = {"jobs_created": 0, "jobs_updated": 0, "files_synced": 0, "errors": []}
+        stats = {
+            "jobs_created": 0,
+            "jobs_updated": 0,
+            "files_synced": 0,
+            "column_mappings_synced": 0,
+            "errors": [],
+        }
 
         for summary in self.connector.get_graphs():
             graph_name = summary["graph_name"]
@@ -39,6 +50,9 @@ class AbInitioSyncService:
                 logger.error(f"Failed to sync Ab Initio graph {graph_name}: {e}")
                 stats["errors"].append(f"{graph_name}: {e}")
 
+        stats["columns_synced"] = replace_table_columns(
+            self.db, SOURCE_SYSTEM, self.connector.get_table_columns()
+        )
         self.db.commit()
         return stats
 
@@ -82,6 +96,11 @@ class AbInitioSyncService:
                 )
             )
         stats["files_synced"] += len(datasets)
+
+        upsert_sla(self.db, job, details.get("expected_completion"))
+        stats["column_mappings_synced"] += replace_column_mappings(
+            self.db, job, self.connector.get_graph_column_lineage(graph_name)
+        )
 
         record_last_run(
             self.db,

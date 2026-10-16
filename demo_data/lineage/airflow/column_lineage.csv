@@ -1,0 +1,37 @@
+job_name,source_dataset,source_column,target_dataset,target_column,transformation
+crm_ingest.sync_accounts,salesforce://Account,Id,RAW.CRM.ACCOUNTS,ACCOUNT_ID,
+crm_ingest.sync_accounts,salesforce://Account,Name,RAW.CRM.ACCOUNTS,ACCOUNT_NAME,
+crm_ingest.sync_accounts,salesforce://Account,Industry,RAW.CRM.ACCOUNTS,INDUSTRY,
+events_ingest.copy_app_events,s3://acme-lake/events/app/,event_id,RAW.EVENTS.APP_EVENTS,EVENT_ID,
+events_ingest.copy_app_events,s3://acme-lake/events/app/,user_id,RAW.EVENTS.APP_EVENTS,USER_ID,
+events_ingest.copy_app_events,s3://acme-lake/events/app/,event_type,RAW.EVENTS.APP_EVENTS,EVENT_TYPE,
+events_ingest.copy_app_events,s3://acme-lake/events/app/,payload,RAW.EVENTS.APP_EVENTS,PAYLOAD,
+events_ingest.copy_app_events,s3://acme-lake/events/app/,event_ts,RAW.EVENTS.APP_EVENTS,EVENT_TS,TO_TIMESTAMP_NTZ(event_ts)
+billing_ingest.copy_invoices,s3://acme-lake/billing/invoices/,invoice_id,RAW.BILLING.INVOICES,INVOICE_ID,
+billing_ingest.copy_invoices,s3://acme-lake/billing/invoices/,account_id,RAW.BILLING.INVOICES,ACCOUNT_ID,
+billing_ingest.copy_invoices,s3://acme-lake/billing/invoices/,amount,RAW.BILLING.INVOICES,AMOUNT,
+billing_ingest.copy_invoices,s3://acme-lake/billing/invoices/,currency,RAW.BILLING.INVOICES,CURRENCY,
+billing_ingest.copy_invoices,s3://acme-lake/billing/invoices/,invoice_date,RAW.BILLING.INVOICES,INVOICE_DATE,TO_DATE(invoice_date)
+dbt_core.stg_app_events,RAW.EVENTS.APP_EVENTS,EVENT_ID,ANALYTICS.STAGING.STG_APP_EVENTS,EVENT_ID,
+dbt_core.stg_app_events,RAW.EVENTS.APP_EVENTS,EVENT_TYPE,ANALYTICS.STAGING.STG_APP_EVENTS,EVENT_TYPE,
+dbt_core.stg_app_events,RAW.EVENTS.APP_EVENTS,EVENT_TS,ANALYTICS.STAGING.STG_APP_EVENTS,EVENT_TS,
+dbt_core.stg_app_events,RAW.EVENTS.APP_EVENTS,USER_ID,ANALYTICS.STAGING.STG_APP_EVENTS,CUSTOMER_ID,Renamed user_id → customer_id
+dbt_core.dim_customers,RAW.CRM.ACCOUNTS,ACCOUNT_ID,ANALYTICS.CORE.DIM_CUSTOMERS,CUSTOMER_ID,MD5(ACCOUNT_ID) surrogate key
+dbt_core.dim_customers,RAW.CRM.ACCOUNTS,ACCOUNT_ID,ANALYTICS.CORE.DIM_CUSTOMERS,ACCOUNT_ID,
+dbt_core.dim_customers,RAW.CRM.ACCOUNTS,ACCOUNT_NAME,ANALYTICS.CORE.DIM_CUSTOMERS,CUSTOMER_NAME,
+dbt_core.dim_customers,RAW.CRM.ACCOUNTS,INDUSTRY,ANALYTICS.CORE.DIM_CUSTOMERS,INDUSTRY,
+dbt_core.fct_sessions,ANALYTICS.STAGING.STG_APP_EVENTS,EVENT_ID,ANALYTICS.CORE.FCT_SESSIONS,SESSION_ID,Sessionize: 30-minute inactivity gap
+dbt_core.fct_sessions,ANALYTICS.STAGING.STG_APP_EVENTS,CUSTOMER_ID,ANALYTICS.CORE.FCT_SESSIONS,CUSTOMER_ID,
+dbt_core.fct_sessions,ANALYTICS.STAGING.STG_APP_EVENTS,EVENT_TS,ANALYTICS.CORE.FCT_SESSIONS,SESSION_START,MIN(EVENT_TS) per session
+dbt_core.fct_sessions,ANALYTICS.STAGING.STG_APP_EVENTS,EVENT_ID,ANALYTICS.CORE.FCT_SESSIONS,EVENT_COUNT,COUNT(EVENT_ID) per session
+dbt_finance.fct_revenue,RAW.BILLING.INVOICES,INVOICE_ID,ANALYTICS.FINANCE.FCT_REVENUE,INVOICE_ID,
+dbt_finance.fct_revenue,ANALYTICS.CORE.DIM_CUSTOMERS,CUSTOMER_ID,ANALYTICS.FINANCE.FCT_REVENUE,CUSTOMER_ID,Join on ACCOUNT_ID
+dbt_finance.fct_revenue,RAW.BILLING.INVOICES,AMOUNT,ANALYTICS.FINANCE.FCT_REVENUE,REVENUE_USD,AMOUNT::NUMBER * fx_rate(CURRENCY)
+dbt_finance.fct_revenue,RAW.BILLING.INVOICES,CURRENCY,ANALYTICS.FINANCE.FCT_REVENUE,REVENUE_USD,AMOUNT::NUMBER * fx_rate(CURRENCY)
+dbt_finance.fct_revenue,RAW.BILLING.INVOICES,INVOICE_DATE,ANALYTICS.FINANCE.FCT_REVENUE,INVOICE_DATE,
+bi_refresh.revenue_daily,ANALYTICS.FINANCE.FCT_REVENUE,INVOICE_DATE,ANALYTICS.MARTS.REVENUE_DAILY,REVENUE_DATE,
+bi_refresh.revenue_daily,ANALYTICS.FINANCE.FCT_REVENUE,REVENUE_USD,ANALYTICS.MARTS.REVENUE_DAILY,TOTAL_REVENUE_USD,SUM(REVENUE_USD)
+bi_refresh.revenue_daily,ANALYTICS.CORE.FCT_SESSIONS,SESSION_ID,ANALYTICS.MARTS.REVENUE_DAILY,ACTIVE_SESSIONS,COUNT(DISTINCT SESSION_ID)
+reverse_etl.push_revenue_to_crm,ANALYTICS.FINANCE.FCT_REVENUE,CUSTOMER_ID,salesforce://Opportunity,AccountId,Map CUSTOMER_ID → Salesforce Account Id
+reverse_etl.push_revenue_to_crm,ANALYTICS.FINANCE.FCT_REVENUE,REVENUE_USD,salesforce://Opportunity,Amount,
+reverse_etl.push_revenue_to_crm,ANALYTICS.FINANCE.FCT_REVENUE,INVOICE_DATE,salesforce://Opportunity,CloseDate,

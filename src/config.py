@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     elasticsearch_port: int = 9200
     elasticsearch_enabled: bool = False
 
+    # Job lineage input files (CSV) used instead of the sample data when present;
+    # see docs/JOB_LINEAGE_DEMO_DATA.md
+    lineage_data_dir: str = "demo_data/lineage"
+
     # Logging
     log_file: str = "logs/app.log"
     log_format: str = "json"

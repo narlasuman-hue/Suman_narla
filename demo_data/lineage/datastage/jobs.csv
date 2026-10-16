@@ -1,0 +1,9 @@
+job_name,owner,description,scheduler_system,schedule_name,frequency,last_run,last_run_status,duration_seconds,error_message,expected_completion,next_run
+dsj_ext_claims,CLAIMS_ETL_TEAM,Extract daily medical claims file,TWS,CLAIMS-NIGHTLY,DAILY,-7h,SUCCESS,1200,,-6h,+17h
+dsj_ext_members,CLAIMS_ETL_TEAM,Extract daily member file,TWS,CLAIMS-NIGHTLY,DAILY,-7h,SUCCESS,600,,-6h,+17h
+dsj_load_member_dim,EDW_TEAM,Load member dimension,TWS,CLAIMS-NIGHTLY,DAILY,-6h,SUCCESS,2700,,-330m,+18h
+dsj_load_provider_dim,EDW_TEAM,Load provider dimension from NPI extract,TWS,CLAIMS-NIGHTLY,DAILY,-5h,FAILED,180,SQL0803N One or more values in the INSERT statement are not valid because they would produce duplicate rows (SQLSTATE=23505),-4h,+19h
+dsj_load_claim_fact,EDW_TEAM,Load claim fact,TWS,CLAIMS-NIGHTLY,DAILY,-29h,SUCCESS,3000,,-1h,+30m
+dsj_build_claims_mart,ANALYTICS_TEAM,Build monthly claims summary mart,TWS,CLAIMS-REPORTING,DAILY,-28h,SUCCESS,900,,+2h,+2h
+dsj_exp_regulatory,COMPLIANCE_TEAM,Export regulatory claims report,TWS,CLAIMS-REPORTING,DAILY,-27h,SUCCESS,300,,+4h,+4h
+dsj_ext_pharmacy,CLAIMS_ETL_TEAM,Extract pharmacy claims file,TWS,RX-NIGHTLY,DAILY,-10m,RUNNING,,,+45m,+23h

@@ -1,41 +1,34 @@
-"""Job lineage for two independent platforms.
+"""Job lineage for independent, configured platforms.
 
-* ``MAINFRAME``: mainframe JCL jobs, which load Teradata tables
-  (BTEQ / FastLoad / MultiLoad) from mainframe datasets;
-* ``HADOOP_ABINITIO``: Ab Initio graphs, which load Hadoop (Hive / HDFS) tables.
-
-Lineage is always built for one platform at a time from the catalog's
-``Job`` / ``JobFile`` rows:
+A platform (see ``src/catalog/platforms.py``) is one world of jobs and the
+tables they load, e.g. mainframe jobs loading Teradata tables, Ab Initio graphs
+loading Hive tables, or Airflow tasks loading Snowflake tables. Lineage is
+always built for one platform at a time from the catalog's ``Job`` / ``JobFile``
+rows:
 
 * job nodes: the platform's jobs;
 * dataset nodes: the datasets/tables those jobs read and write;
 * edges: ``dataset -> job`` for inputs and ``job -> dataset`` for outputs.
+
+A dataset whose ``dataset_type`` is one of the platform's ``table_types`` is a
+*table* (``is_table``); a job that writes a table is a *load* job (``LOAD``).
 
 For SRE triage, every node downstream of a job whose latest run failed is
 flagged as impacted (the failure's blast radius).
 """
 
 from collections import deque
+from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from sqlalchemy.orm import Session, selectinload
 
 from src.catalog.models import Job
+from src.catalog.platforms import Platform, get_platform
 from src.catalog.services.job_runs import RUN_FAILED, RUN_RUNNING
+from src.catalog.services.sla import COMPLETED_LATE, LATE, MET, SEVERITY, evaluate_sla
 
-PLATFORM_LABELS = {
-    "MAINFRAME": "Mainframe / Teradata",
-    "HADOOP_ABINITIO": "Hadoop / Ab Initio",
-}
 DIRECTIONS = ("upstream", "downstream", "both")
-
-# The tables each platform loads: Teradata tables for mainframe jobs,
-# Hive/HDFS tables for Ab Initio graphs.
-TABLE_PLATFORM = {"MAINFRAME": "TERADATA", "HADOOP_ABINITIO": "HADOOP"}
-
-# Where a dataset lives, by dataset_type. Anything else (PS, VSAM, GDG, PDS...)
-# is a mainframe dataset.
-_DATASET_PLATFORM = {"TERADATA": "TERADATA", "HIVE": "HADOOP", "HDFS": "HADOOP"}
 
 Graph = Tuple[Dict[str, Dict[str, Any]], List[Dict[str, Any]]]
 
@@ -52,6 +45,29 @@ def dataset_node_id(dataset_name: str) -> str:
     return f"dataset:{name}"
 
 
+def database_of(dataset_name: str, is_table: bool) -> str:
+    """The database a dataset belongs to, for database-level lineage.
+
+    * Table ``DB.TABLE`` -> ``DB``; ``DB.SCHEMA.TABLE`` (e.g. Snowflake) -> ``DB.SCHEMA``
+    * Path ``/data/raw/cards/auth`` -> zone ``/data/raw``
+    * URL ``s3://lake/events/`` -> bucket ``s3://lake``; ``salesforce://Account`` -> ``salesforce``
+    * Mainframe DSN ``PROD.PAYROLL.GL.EXTRACT`` -> high-level qualifiers ``PROD.PAYROLL``
+    * Other ``SCHEMA.TABLE`` sources (e.g. ``CRM.CUSTOMERS``) -> ``CRM``
+    """
+    name = dataset_name.strip()
+    if "://" in name:
+        scheme, rest = name.split("://", 1)
+        parts = [p for p in rest.split("/") if p]
+        return f"{scheme}://{parts[0]}" if len(parts) > 1 else scheme
+    if name.startswith("/"):
+        parts = [p for p in name.split("/") if p]
+        return "/" + "/".join(parts[:2])
+    if is_table:
+        return name.rsplit(".", 1)[0] if "." in name else name
+    qualifiers = name.split(".")
+    return ".".join(qualifiers[:2]) if len(qualifiers) > 2 else qualifiers[0]
+
+
 def job_node_id(job_id: int) -> str:
     return f"job:{job_id}"
 
@@ -60,15 +76,13 @@ def _iso(value) -> Optional[str]:
     return value.isoformat() if value else None
 
 
-def _job_type(job: Job) -> str:
-    if job.source_system == "HADOOP_ABINITIO":
-        return "AB_INITIO_GRAPH"
-    writes_teradata = any(
-        (f.dataset_type or "").upper() == "TERADATA"
-        and (f.direction or "").upper() in ("OUTPUT", "INOUT")
+def _job_type(job: Job, platform: Platform) -> str:
+    """``LOAD`` if the job writes one of the platform's tables, else ``JOB``."""
+    writes_table = any(
+        platform.is_table(f.dataset_type) and (f.direction or "").upper() in ("OUTPUT", "INOUT")
         for f in job.files
     )
-    return "TERADATA_LOAD" if writes_teradata else "JCL"
+    return "LOAD" if writes_table else "JOB"
 
 
 class JobLineageService:
@@ -79,12 +93,13 @@ class JobLineageService:
 
     # ---------- graph construction ----------
 
-    def _load(self, platform: str) -> Graph:
-        if platform not in PLATFORM_LABELS:
-            raise ValueError(f"Unknown platform: {platform}")
+    def _load(self, platform: str, now: Optional[datetime] = None) -> Graph:
+        config = get_platform(platform)  # ValueError for an unknown platform
         jobs = (
             self.db.query(Job)
-            .options(selectinload(Job.files), selectinload(Job.executions))
+            .options(
+                selectinload(Job.files), selectinload(Job.executions), selectinload(Job.sla)
+            )
             .filter(Job.source_system == platform)
             .order_by(Job.name)
             .all()
@@ -92,6 +107,7 @@ class JobLineageService:
 
         nodes: Dict[str, Dict[str, Any]] = {}
         edges: Dict[str, Dict[str, Any]] = {}
+        slas = {}  # job node id -> (expected completion, last run start)
 
         for job in jobs:
             jid = job_node_id(job.id)
@@ -102,8 +118,8 @@ class JobLineageService:
                 "catalog_id": job.id,
                 "name": job.name,
                 "platform": job.source_system,
-                "platform_label": PLATFORM_LABELS[job.source_system],
-                "job_type": _job_type(job),
+                "platform_label": config.name,
+                "job_type": _job_type(job, config),
                 "owner": job.owner,
                 "description": job.description,
                 "scheduler_system": job.scheduler_system,
@@ -114,11 +130,15 @@ class JobLineageService:
                 "run_status": latest.status if latest else "UNKNOWN",
                 "run_duration_seconds": latest.duration_seconds if latest else None,
                 "run_error": latest.error_message if latest else None,
+                "sla": None,
             }
+            if job.sla is not None:
+                slas[jid] = (job.sla.expected_completion, job.last_run)
 
             for f in job.files:
                 did = dataset_node_id(f.dataset_name)
                 dataset_type = (f.dataset_type or "").upper() or None
+                is_table = config.is_table(dataset_type)
                 nodes.setdefault(
                     did,
                     {
@@ -126,7 +146,8 @@ class JobLineageService:
                         "type": "dataset",
                         "name": f.dataset_name.strip(),
                         "dataset_type": dataset_type,
-                        "platform": _DATASET_PLATFORM.get(dataset_type or "", "MAINFRAME"),
+                        "is_table": is_table,
+                        "database": database_of(f.dataset_name, is_table),
                     },
                 )
                 direction = (f.direction or "").upper()
@@ -136,6 +157,9 @@ class JobLineageService:
                     self._add_edge(edges, jid, did, f.dd_name)
 
         self._mark_impact(nodes, list(edges.values()))
+        # SLA status depends on impact (a blocked job is at risk), so evaluate after it.
+        for jid, (expected, last_run) in slas.items():
+            nodes[jid]["sla"] = evaluate_sla(nodes[jid], expected, last_run, now)
         return nodes, list(edges.values())
 
     @staticmethod
@@ -235,9 +259,7 @@ class JobLineageService:
         tables = [
             n
             for n in nodes.values()
-            if n["type"] == "dataset"
-            and n["platform"] == TABLE_PLATFORM[platform]
-            and needle in n["name"].lower()
+            if n["type"] == "dataset" and n["is_table"] and needle in n["name"].lower()
         ]
         # Exact and prefix matches first, then alphabetical.
         tables.sort(
@@ -301,6 +323,46 @@ class JobLineageService:
             "upstream_issues": upstream_issues,
         }
 
+    def get_sla(self, platform: str, now: Optional[datetime] = None) -> Dict[str, Any]:
+        """SLA status of every job that has an expected completion time, worst first.
+
+        Each row includes ``blocked_by``: failed or still-running jobs upstream of
+        it, which is usually why a job is late or at risk.
+        """
+        nodes, edges = self._load(platform, now)
+        reverse = self._adjacency(edges, reverse=True)
+        jobs = [n for n in nodes.values() if n["type"] == "job"]
+
+        rows = []
+        for job in (j for j in jobs if j["sla"]):
+            if job["sla"]["status"] in (MET, COMPLETED_LATE):
+                rows.append({**job, "blocked_by": []})  # already completed
+                continue
+            upstream = self._reachable(job["id"], reverse)
+            blocked_by = sorted(
+                (
+                    {"id": nid, "name": nodes[nid]["name"], "run_status": nodes[nid]["run_status"]}
+                    for nid in upstream
+                    if nodes[nid]["type"] == "job"
+                    and nodes[nid]["run_status"] in (RUN_FAILED, RUN_RUNNING)
+                ),
+                key=lambda b: (upstream[b["id"]], b["name"]),
+            )
+            rows.append({**job, "blocked_by": blocked_by})
+
+        rows.sort(
+            key=lambda r: (SEVERITY[r["sla"]["status"]], -r["sla"]["late_by_minutes"], r["name"])
+        )
+        counts = {status: 0 for status in SEVERITY}
+        for r in rows:
+            counts[r["sla"]["status"]] += 1
+        return {
+            "platform": platform,
+            "jobs": rows,
+            "counts": counts,
+            "jobs_without_sla": len(jobs) - len(rows),
+        }
+
     @staticmethod
     def _summarize(
         nodes: Dict[str, Dict[str, Any]], edges: List[Dict[str, Any]]
@@ -309,14 +371,18 @@ class JobLineageService:
         written = {e["target"] for e in edges}
         return {
             "jobs": len(jobs),
-            # Teradata tables (mainframe) or Hive/HDFS tables (Ab Initio) a job loads
+            # The platform's tables (per its table_types) that some job loads
             "tables_loaded": sum(
                 1
                 for nid, n in nodes.items()
-                if n["type"] == "dataset" and n["platform"] != "MAINFRAME" and nid in written
+                if n["type"] == "dataset" and n["is_table"] and nid in written
             ),
             "datasets": sum(1 for n in nodes.values() if n["type"] == "dataset"),
             "failed_jobs": [j["name"] for j in jobs if j["run_status"] == RUN_FAILED],
+            "sla_late": sum(
+                1 for j in jobs if j["sla"] and j["sla"]["status"] in (LATE, COMPLETED_LATE)
+            ),
+            "sla_at_risk": sum(1 for j in jobs if j["sla"] and j["sla"]["status"] == "AT_RISK"),
             "running_jobs": [j["name"] for j in jobs if j["run_status"] == RUN_RUNNING],
             "impacted_jobs": sum(1 for j in jobs if j["impacted"]),
         }

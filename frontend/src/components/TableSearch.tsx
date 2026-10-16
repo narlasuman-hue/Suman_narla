@@ -1,22 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { FiSearch, FiX } from 'react-icons/fi';
 import { LineagePlatform, LineageTableResult, searchJobLineageTables } from '../services/api';
-import { RunStatusBadge } from './LineageDetailsPanel';
+import { RunStatusBadge } from './lineageBadges';
 
 interface TableSearchProps {
   platform: LineagePlatform;
+  /** What the platform calls its tables, e.g. "Teradata table" */
+  tableLabel: string;
   onSelect: (table: LineageTableResult) => void;
 }
-
-const PLACEHOLDER: Record<LineagePlatform, string> = {
-  MAINFRAME: 'Search Teradata table, e.g. FINANCE_DB.GL_POSTINGS',
-  HADOOP_ABINITIO: 'Search Hadoop table, e.g. fin_raw.gl_postings',
-};
 
 const DEBOUNCE_MS = 200;
 
 /** Search box for the selected platform's tables; picking one shows its lineage. */
-const TableSearch: React.FC<TableSearchProps> = ({ platform, onSelect }) => {
+const TableSearch: React.FC<TableSearchProps> = ({ platform, tableLabel, onSelect }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<LineageTableResult[]>([]);
   const [open, setOpen] = useState(false);
@@ -103,7 +100,7 @@ const TableSearch: React.FC<TableSearchProps> = ({ platform, onSelect }) => {
         }}
         onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
-        placeholder={PLACEHOLDER[platform]}
+        placeholder={`Search ${tableLabel}s by name`}
         className="w-full pl-9 pr-9 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
       />
       {query && (

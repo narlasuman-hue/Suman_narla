@@ -11,43 +11,23 @@ interface LineageGraphProps {
   highlightIds: Set<string> | null;
   /** If fitting everything would be unreadable, center on this node instead. */
   centerId?: string | null;
+  /** The platform's color, used for its load jobs and tables. */
+  color: string;
   onSelect: (id: string | null) => void;
 }
 
 const COLUMN_GAP = 210;
+const LABELLED_COLUMN_GAP = 300; // room for job names on the arrows
 const ROW_GAP = 78;
 const MAX_FIT_ZOOM = 1.1;
 const MIN_READABLE_ZOOM = 0.75;
-
-/**
- * Job-to-job view: drop dataset nodes and connect each job that writes a
- * dataset to each job that reads it.
- */
-export const collapseToJobs = (nodes: LineageNode[], edges: LineageEdge[]) => {
-  const isJob = new Set(nodes.filter((n) => n.type === 'job').map((n) => n.id));
-  const writers = new Map<string, string[]>();
-  edges.forEach((e) => {
-    if (isJob.has(e.source)) writers.set(e.target, [...(writers.get(e.target) || []), e.source]);
-  });
-  const jobEdges = new Map<string, LineageEdge>();
-  edges.forEach((e) => {
-    if (!isJob.has(e.target)) return;
-    (writers.get(e.source) || []).forEach((writer) => {
-      const id = `${writer}=>${e.target}`;
-      if (writer !== e.target && !jobEdges.has(id)) {
-        jobEdges.set(id, { id, source: writer, target: e.target });
-      }
-    });
-  });
-  return { nodes: nodes.filter((n) => isJob.has(n.id)), edges: Array.from(jobEdges.values()) };
-};
 
 /**
  * Left-to-right layered layout: each node's column is the longest path from
  * a source, so data always flows rightward. Rows are ordered by the average
  * row of each node's predecessors to keep edge crossings down.
  */
-const layeredPositions = (nodes: LineageNode[], edges: LineageEdge[]) => {
+const layeredPositions = (nodes: LineageNode[], edges: LineageEdge[], columnGap: number) => {
   const preds = new Map<string, string[]>();
   const succs = new Map<string, string[]>();
   const indegree = new Map<string, number>();
@@ -94,16 +74,23 @@ const layeredPositions = (nodes: LineageNode[], edges: LineageEdge[]) => {
       column.sort((a, b) => score(a) - score(b) || a.name.localeCompare(b.name));
       column.forEach((n, i) => {
         row.set(n.id, i);
-        positions[n.id] = { x: r * COLUMN_GAP, y: (i - (column.length - 1) / 2) * ROW_GAP };
+        positions[n.id] = { x: r * columnGap, y: (i - (column.length - 1) / 2) * ROW_GAP };
       });
     });
   return positions;
 };
 
 const statusIcon: Record<string, string> = { FAILED: '✖ ', RUNNING: '▶ ' };
+const SLA_LATE = new Set(['LATE', 'COMPLETED_LATE']);
 
-const toElements = (nodes: LineageNode[], edges: LineageEdge[]): ElementDefinition[] => {
-  const positions = layeredPositions(nodes, edges);
+const toElements = (
+  nodes: LineageNode[],
+  edges: LineageEdge[],
+  color: string
+): ElementDefinition[] => {
+  const labelled = edges.some((e) => e.label);
+  const columnGap = labelled ? LABELLED_COLUMN_GAP : COLUMN_GAP;
+  const positions = layeredPositions(nodes, edges, columnGap);
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const failed = (id: string) => {
     const n = byId.get(id);
@@ -112,30 +99,48 @@ const toElements = (nodes: LineageNode[], edges: LineageEdge[]): ElementDefiniti
 
   return [
     ...nodes.map((n) => {
+      const slaLate = n.type === 'job' && n.sla && SLA_LATE.has(n.sla.status) ? '⏰ ' : '';
       const label =
         n.type === 'job'
-          ? `${statusIcon[n.run_status] || ''}${n.name}\n${n.scheduler_system || ''} · ${n.schedule_name || ''}`
-          : `${n.name}\n${n.dataset_type || ''}`;
+          ? `${slaLate}${statusIcon[n.run_status] || ''}${n.name}\n${n.scheduler_system || ''} · ${n.schedule_name || ''}`
+          : `${n.name}\n${n.subtitle ?? n.dataset_type ?? ''}`;
+      const classes = [
+        n.impacted ? 'impacted' : '',
+        n.type === 'dataset' && n.dataset_type === 'DATABASE' ? 'database' : '',
+      ];
       return {
         group: 'nodes' as const,
         data: {
           id: n.id,
           label,
-          kind: n.type === 'job' ? n.job_type : `DS_${n.platform}`,
+          // JOB / LOAD for jobs; TABLE (the platform's tables) / SOURCE for datasets
+          kind: n.type === 'job' ? n.job_type : n.is_table ? 'TABLE' : 'SOURCE',
+          color,
           status: n.type === 'job' ? n.run_status : '',
         },
-        classes: n.impacted ? 'impacted' : '',
+        classes: classes.filter(Boolean).join(' '),
         position: positions[n.id],
       };
     }),
-    ...edges.map((e) => ({
-      group: 'edges' as const,
-      data: { id: e.id, source: e.source, target: e.target },
-      classes:
-        (byId.get(e.target)?.impacted && (byId.get(e.source)?.impacted || failed(e.source)))
-          ? 'impacted'
-          : '',
-    })),
+    ...edges.map((e) => {
+      const impacted =
+        byId.get(e.target)?.impacted && (byId.get(e.source)?.impacted || failed(e.source));
+      // An arrow that skips a column would run straight through the boxes in between;
+      // bow it out instead.
+      const from = positions[e.source];
+      const to = positions[e.target];
+      const skips = from && to && Math.abs(to.x - from.x) > columnGap * 1.5 && Math.abs(to.y - from.y) < ROW_GAP;
+      const classes = [
+        impacted ? 'impacted' : '',
+        e.status === 'FAILED' ? 'failed' : '',
+        skips ? 'skip' : '',
+      ];
+      return {
+        group: 'edges' as const,
+        data: { id: e.id, source: e.source, target: e.target, ...(e.label ? { label: e.label } : {}) },
+        classes: classes.filter(Boolean).join(' '),
+      };
+    }),
   ];
 };
 
@@ -155,14 +160,12 @@ const style: cytoscape.StylesheetJson = [
       'border-width': 2,
     },
   },
-  // Jobs: solid fill, coloured by platform
-  { selector: 'node[kind="JCL"]', style: { shape: 'round-rectangle', 'background-color': '#3730a3', 'border-color': '#312e81', color: '#fff' } },
-  { selector: 'node[kind="TERADATA_LOAD"]', style: { shape: 'round-rectangle', 'background-color': '#c2410c', 'border-color': '#9a3412', color: '#fff' } },
-  { selector: 'node[kind="AB_INITIO_GRAPH"]', style: { shape: 'round-rectangle', 'background-color': '#0f766e', 'border-color': '#115e59', color: '#fff' } },
-  // Datasets: light fill, coloured border, by where the data lives
-  { selector: 'node[kind="DS_MAINFRAME"]', style: { shape: 'barrel', 'background-color': '#eef2ff', 'border-color': '#6366f1', color: '#1e1b4b' } },
-  { selector: 'node[kind="DS_TERADATA"]', style: { shape: 'barrel', 'background-color': '#fff7ed', 'border-color': '#f97316', color: '#431407' } },
-  { selector: 'node[kind="DS_HADOOP"]', style: { shape: 'barrel', 'background-color': '#f0fdfa', 'border-color': '#14b8a6', color: '#042f2e' } },
+  // Jobs: solid fill. Jobs that load the platform's tables take the platform's color.
+  { selector: 'node[kind="JOB"]', style: { shape: 'round-rectangle', 'background-color': '#3730a3', 'border-color': '#312e81', color: '#fff' } },
+  { selector: 'node[kind="LOAD"]', style: { shape: 'round-rectangle', 'background-color': 'data(color)', 'border-color': 'data(color)', color: '#fff' } },
+  // Datasets: light fill and colored border. The platform's tables take its color.
+  { selector: 'node[kind="SOURCE"]', style: { shape: 'barrel', 'background-color': '#f1f5f9', 'border-color': '#64748b', color: '#0f172a' } },
+  { selector: 'node[kind="TABLE"]', style: { shape: 'barrel', 'background-color': 'data(color)', 'background-opacity': 0.1, 'border-color': 'data(color)', color: '#111827' } },
   // Run status
   { selector: 'node[status="FAILED"]', style: { 'border-color': '#dc2626', 'border-width': 5 } },
   { selector: 'node[status="RUNNING"]', style: { 'border-color': '#60a5fa', 'border-width': 4, 'border-style': 'dashed' } },
@@ -178,7 +181,27 @@ const style: cytoscape.StylesheetJson = [
       'curve-style': 'bezier',
     },
   },
+  {
+    selector: 'edge[label]',
+    style: {
+      label: 'data(label)',
+      'font-size': 10,
+      color: '#334155',
+      'text-background-color': '#ffffff',
+      'text-background-opacity': 0.9,
+      'text-background-padding': '2px',
+      'text-background-shape': 'roundrectangle',
+      'text-max-width': '110px',
+      'text-wrap': 'ellipsis',
+    },
+  },
+  {
+    selector: 'edge.skip',
+    style: { 'curve-style': 'unbundled-bezier', 'control-point-distances': [-55], 'control-point-weights': [0.5] },
+  },
   { selector: 'edge.impacted', style: { width: 3, 'line-color': '#f59e0b', 'target-arrow-color': '#f59e0b' } },
+  { selector: 'edge.failed', style: { width: 3, 'line-color': '#dc2626', 'target-arrow-color': '#dc2626', color: '#b91c1c' } },
+  { selector: 'node.database', style: { shape: 'round-rectangle', 'border-width': 3, 'font-weight': 'bold' } },
   { selector: '.selected-node', style: { 'overlay-color': '#111827', 'overlay-opacity': 0.2, 'overlay-padding': 8 } },
   { selector: '.dimmed', style: { opacity: 0.15 } },
 ];
@@ -189,6 +212,7 @@ const LineageGraph: React.FC<LineageGraphProps> = ({
   selectedId,
   highlightIds,
   centerId,
+  color,
   onSelect,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -200,7 +224,7 @@ const LineageGraph: React.FC<LineageGraphProps> = ({
     if (!containerRef.current) return;
     const cy = cytoscape({
       container: containerRef.current,
-      elements: toElements(nodes, edges),
+      elements: toElements(nodes, edges, color),
       style,
       layout: { name: 'preset', fit: true, padding: 30 },
       minZoom: 0.15,
@@ -217,8 +241,21 @@ const LineageGraph: React.FC<LineageGraphProps> = ({
       cy.zoom(MAX_FIT_ZOOM);
       cy.center();
     } else if (centerId && cy.zoom() < MIN_READABLE_ZOOM && cy.getElementById(centerId).nonempty()) {
+      // Too big to fit readably: zoom in around the focus node, then slide the graph
+      // toward any empty side so the focus's upstream/downstream fills the view.
+      const focusNode = cy.getElementById(centerId);
       cy.zoom(MIN_READABLE_ZOOM);
-      cy.center(cy.getElementById(centerId));
+      cy.center(focusNode);
+      const pad = 30;
+      const width = cy.width();
+      const box = cy.elements().renderedBoundingBox();
+      let dx = 0;
+      if (box.x2 < width - pad) dx = width - pad - box.x2;
+      else if (box.x1 > pad) dx = pad - box.x1;
+      const fx = focusNode.renderedPosition().x;
+      const half = focusNode.renderedWidth() / 2;
+      dx = Math.min(Math.max(dx, pad + half - fx), width - pad - half - fx); // keep focus on screen
+      cy.panBy({ x: dx, y: 0 });
     }
     cyRef.current = cy;
     // Keep cytoscape's viewport in sync when the container is resized
@@ -232,7 +269,7 @@ const LineageGraph: React.FC<LineageGraphProps> = ({
     };
     // Re-run only when the graph itself changes, not when the center hint does.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, edges]);
+  }, [nodes, edges, color]);
 
   useEffect(() => {
     const cy = cyRef.current;

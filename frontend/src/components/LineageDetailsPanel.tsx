@@ -1,8 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { FiAlertTriangle, FiCrosshair, FiExternalLink, FiX, FiZap } from 'react-icons/fi';
-import { formatDistanceToNow } from 'date-fns';
-import { JobLineageImpact, LineageEdge, LineageNode } from '../services/api';
+import { JobLineageImpact, LineageEdge, LineageNode, PlatformInfo } from '../services/api';
+import {
+  formatLate,
+  formatTime,
+  relative,
+  RunStatusBadge,
+  SlaBadge,
+} from './lineageBadges';
+import TableColumnsList from './TableColumnsList';
 
 interface Props {
   node: LineageNode | null;
@@ -14,39 +21,19 @@ interface Props {
   onShowImpact: (id: string) => void;
   onSelect: (id: string) => void;
   onClose: () => void;
+  platform: PlatformInfo;
+  /** Open column-level lineage for a column of the selected table. */
+  onColumnSelect: (columnId: string) => void;
 }
 
-/** API timestamps are naive UTC; mark them as UTC before parsing. */
-export const parseUtc = (iso?: string) =>
-  iso ? new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : `${iso}Z`) : null;
-
-const relative = (iso?: string) => {
-  const d = parseUtc(iso);
-  return d ? formatDistanceToNow(d, { addSuffix: true }) : '-';
-};
-
-const statusStyle: Record<string, string> = {
-  SUCCESS: 'bg-green-100 text-green-800',
-  FAILED: 'bg-red-100 text-red-800',
-  RUNNING: 'bg-blue-100 text-blue-800',
-};
-
-export const RunStatusBadge: React.FC<{ status: string }> = ({ status }) => (
-  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${statusStyle[status] || 'bg-gray-100 text-gray-700'}`}>
-    {status}
-  </span>
-);
-
-const jobTypeLabel: Record<string, string> = {
-  JCL: 'Mainframe JCL job',
-  TERADATA_LOAD: 'Mainframe → Teradata load job',
-  AB_INITIO_GRAPH: 'Ab Initio graph (Hadoop)',
-};
-
-const datasetPlatformLabel: Record<string, string> = {
-  MAINFRAME: 'Mainframe dataset',
-  TERADATA: 'Teradata table',
-  HADOOP: 'Hadoop (HDFS / Hive)',
+/** "Mainframe job · loads Teradata tables", "Teradata table", "Source dataset". */
+const nodeKindLabel = (node: LineageNode, platform: PlatformInfo) => {
+  if (node.type === 'job') {
+    return node.job_type === 'LOAD'
+      ? `${platform.job_label} · loads ${platform.table_label}s`
+      : platform.job_label;
+  }
+  return node.is_table ? platform.table_label : 'Source dataset';
 };
 
 const Row: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
@@ -87,12 +74,13 @@ const LineageDetailsPanel: React.FC<Props> = ({
   onShowImpact,
   onSelect,
   onClose,
+  platform,
+  onColumnSelect,
 }) => {
   if (!node) return null;
 
-  // Teradata / Hadoop tables are "loaded" by jobs; mainframe datasets are written.
-  const writtenLabel =
-    node.type === 'dataset' && node.platform !== 'MAINFRAME' ? 'Loaded by' : 'Written by';
+  // The platform's tables are "loaded" by jobs; other datasets are written.
+  const writtenLabel = node.type === 'dataset' && node.is_table ? 'Loaded by' : 'Written by';
   const inputs = edges.filter((e) => e.target === node.id).map((e) => e.source);
   const outputs = edges.filter((e) => e.source === node.id).map((e) => e.target);
 
@@ -103,7 +91,7 @@ const LineageDetailsPanel: React.FC<Props> = ({
           <FiX size={18} />
         </button>
         <p className="text-xs text-gray-500">
-          {node.type === 'job' ? jobTypeLabel[node.job_type] : datasetPlatformLabel[node.platform]}
+          {nodeKindLabel(node, platform)}
         </p>
         <h2 className="text-lg font-bold text-gray-900 break-all">{node.name}</h2>
         {node.type === 'job' && node.description && (
@@ -124,10 +112,27 @@ const LineageDetailsPanel: React.FC<Props> = ({
           <Row label="Schedule">{node.schedule_name || '-'}</Row>
           <Row label="Frequency">{node.frequency || '-'}</Row>
           <Row label="Owner">{node.owner || '-'}</Row>
+          {node.sla ? (
+            <>
+              <Row label="SLA">
+                <SlaBadge status={node.sla.status} />
+                {node.sla.late_by_minutes > 0 && (
+                  <span className="ml-2 font-semibold text-red-700">
+                    {formatLate(node.sla.late_by_minutes)} late
+                  </span>
+                )}
+              </Row>
+              <Row label="Expected by">{formatTime(node.sla.expected_completion)}</Row>
+              <p className="text-xs text-gray-500 pt-1">{node.sla.reason}</p>
+            </>
+          ) : (
+            <Row label="SLA">Not tracked</Row>
+          )}
         </div>
       ) : (
         <div>
           <Row label="Type">{node.dataset_type || '-'}</Row>
+          <Row label="Database">{node.database}</Row>
           <Row label={writtenLabel}>{inputs.length} job(s)</Row>
           <Row label="Read by">{outputs.length} job(s)</Row>
         </div>
@@ -203,6 +208,10 @@ const LineageDetailsPanel: React.FC<Props> = ({
           )}
         </div>
       )}
+      {node.type === 'dataset' && (
+        <TableColumnsList platform={platform.id} datasetId={node.id} onColumnSelect={onColumnSelect} />
+      )}
+
       <NodeLinkList title={node.type === 'job' ? 'Reads' : writtenLabel} ids={inputs} nodesById={nodesById} onSelect={onSelect} />
       <NodeLinkList title={node.type === 'job' ? 'Writes' : 'Read by'} ids={outputs} nodesById={nodesById} onSelect={onSelect} />
 
