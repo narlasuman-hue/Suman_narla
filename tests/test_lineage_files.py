@@ -8,15 +8,9 @@ from fastapi import HTTPException
 
 from src.api.routes import job_lineage as job_lineage_routes
 from src.catalog.models import Job
-from src.catalog.services.abinitio_sync import create_abinitio_sync_service
 from src.catalog.services.job_lineage import JobLineageService
-from src.catalog.services.mainframe_sync import create_mainframe_sync_service
-from src.connectors.lineage_files import (
-    CsvAbInitioConnector,
-    CsvMainframeConnector,
-    LineageFileError,
-    parse_time,
-)
+from src.catalog.services.lineage_sync import LineageSyncService
+from src.connectors.lineage_files import CsvLineageConnector, LineageFileError, parse_time
 
 DEMO_DIR = Path(__file__).resolve().parent.parent / "demo_data" / "lineage"
 
@@ -30,6 +24,11 @@ AI_GRAPHS = (
     "duration_seconds,error_message,next_run\n"
 )
 AI_DATASETS = "graph_name,port,dataset_name,direction,dataset_type\n"
+
+
+def sync(db, base, folder="mainframe", platform="MAINFRAME"):
+    with CsvLineageConnector(str(base), folder) as connector:
+        return LineageSyncService(db, platform, connector).sync_all()
 
 
 def write_files(base: Path, mf_jobs="", mf_ds="", ai_graphs="", ai_ds="") -> Path:
@@ -55,12 +54,8 @@ def test_parse_time_relative_and_iso():
 
 def test_shipped_demo_files_load(db):
     """The demo files in demo_data/lineage are valid and tell the intended story."""
-    with CsvMainframeConnector(str(DEMO_DIR)) as mf:
-        stats = create_mainframe_sync_service(db, mf).sync_all_jobs()
-        assert stats["errors"] == []
-    with CsvAbInitioConnector(str(DEMO_DIR)) as ai:
-        stats = create_abinitio_sync_service(db, ai).sync_all_graphs()
-        assert stats["errors"] == []
+    assert sync(db, DEMO_DIR)["errors"] == []
+    assert sync(db, DEMO_DIR, "abinitio", "HADOOP_ABINITIO")["errors"] == []
 
     service = JobLineageService(db)
     mf = service.get_graph("MAINFRAME")["summary"]
@@ -87,8 +82,7 @@ def test_csv_values_reach_the_catalog(db, tmp_path):
             "TDLOAD1,TDTGT,sales_db.daily_sales,output,teradata\n"
         ),
     )
-    with CsvMainframeConnector(str(base)) as mf:
-        create_mainframe_sync_service(db, mf).sync_all_jobs()
+    sync(db, base)
 
     job = db.query(Job).filter(Job.name == "TDLOAD1").one()
     assert (job.scheduler_system, job.schedule_name, job.frequency) == ("CA-7", "DW-DAILY", "DAILY")
@@ -103,8 +97,7 @@ def test_csv_values_reach_the_catalog(db, tmp_path):
 
 def test_running_status_from_files(db, tmp_path):
     base = write_files(tmp_path, mf_jobs="JOB1,,CA-7,S1,,-10m,RUNNING,,,\n")
-    with CsvMainframeConnector(str(base)) as mf:
-        create_mainframe_sync_service(db, mf).sync_all_jobs()
+    sync(db, base)
     assert db.query(Job).filter(Job.name == "JOB1").one().executions[0].status == "RUNNING"
 
 
@@ -128,7 +121,7 @@ def test_running_status_from_files(db, tmp_path):
 def test_invalid_files_report_line_and_problem(tmp_path, files, message):
     base = write_files(tmp_path, **files)
     with pytest.raises(LineageFileError, match=message) as exc_info:
-        CsvMainframeConnector(str(base)).connect()
+        CsvLineageConnector(str(base), "mainframe").connect()
     assert "line" in str(exc_info.value)
 
 
@@ -136,12 +129,12 @@ def test_missing_column_and_file(tmp_path):
     base = write_files(tmp_path)
     (base / "abinitio/graphs.csv").write_text("graph_name,owner\n")
     with pytest.raises(LineageFileError, match="missing column"):
-        CsvAbInitioConnector(str(base)).connect()
+        CsvLineageConnector(str(base), "abinitio").connect()
 
     (base / "abinitio/graph_datasets.csv").unlink()
     (base / "abinitio/graphs.csv").write_text(AI_GRAPHS)
     with pytest.raises(LineageFileError, match="file not found"):
-        CsvAbInitioConnector(str(base)).connect()
+        CsvLineageConnector(str(base), "abinitio").connect()
 
 
 @pytest.mark.asyncio
@@ -149,8 +142,15 @@ async def test_sync_route_uses_files_when_present(db, monkeypatch):
     monkeypatch.setattr(job_lineage_routes.settings, "lineage_data_dir", str(DEMO_DIR))
     stats = await job_lineage_routes.sync_job_lineage(db)
     assert stats["source"].startswith("files:")
-    assert stats["mainframe"]["jobs_created"] == 13
-    assert stats["abinitio"]["jobs_created"] == 11
+    created = {p: r["jobs_created"] for p, r in stats["platforms"].items()}
+    assert created == {
+        "MAINFRAME": 13,
+        "HADOOP_ABINITIO": 11,
+        "INFORMATICA_ORACLE": 8,
+        "AIRFLOW_SNOWFLAKE": 9,
+        "DATASTAGE_DB2": 8,
+    }
+    assert stats["jobs_synced"] == 49
 
 
 @pytest.mark.asyncio

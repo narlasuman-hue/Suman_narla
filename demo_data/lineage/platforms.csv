@@ -1,0 +1,6 @@
+platform_id,folder,name,description,job_label,table_label,table_types,color
+MAINFRAME,mainframe,Mainframe → Teradata,Mainframe jobs loading Teradata tables,Mainframe job,Teradata table,TERADATA,#c2410c
+HADOOP_ABINITIO,abinitio,Ab Initio → Hadoop,Ab Initio graphs loading Hadoop tables,Ab Initio graph,Hadoop table,HIVE;HDFS,#0f766e
+INFORMATICA_ORACLE,informatica,Informatica → Oracle,Informatica workflows loading Oracle tables,Informatica workflow,Oracle table,ORACLE,#7c3aed
+AIRFLOW_SNOWFLAKE,airflow,Airflow → Snowflake,Airflow tasks loading Snowflake tables,Airflow task,Snowflake table,SNOWFLAKE,#0369a1
+DATASTAGE_DB2,datastage,DataStage → DB2,DataStage jobs loading DB2 tables,DataStage job,DB2 table,DB2,#4d7c0f

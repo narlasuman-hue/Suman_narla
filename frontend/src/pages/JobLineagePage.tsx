@@ -4,7 +4,6 @@ import {
   FiAlertOctagon,
   FiClock,
   FiColumns,
-  FiDatabase,
   FiGitBranch,
   FiGrid,
   FiLayers,
@@ -18,6 +17,7 @@ import toast from 'react-hot-toast';
 import {
   getColumnLineage,
   getJobLineageGraph,
+  getLineagePlatforms,
   getJobLineageImpact,
   searchJobLineageColumns,
   syncJobLineage,
@@ -26,8 +26,8 @@ import {
   JobLineageGraph,
   JobLineageImpact,
   LineageDirection,
-  LineagePlatform,
   LineageTableResult,
+  PlatformInfo,
 } from '../services/api';
 import { StatCard } from '../components/StatCard';
 import LineageGraph from '../components/LineageGraph';
@@ -46,48 +46,21 @@ import {
   LineageView,
 } from '../utils/lineageViews';
 
-/** The two independent platforms; the user picks one and sees only its lineage. */
-const PLATFORMS: Record<
-  LineagePlatform,
-  {
-    param: string;
-    title: string;
-    subtitle: string;
-    icon: React.ComponentType<{ size?: number; className?: string }>;
-    jobsLabel: string;
-    tablesLabel: string;
-    legend: { label: string; className: string }[];
-  }
-> = {
-  MAINFRAME: {
-    param: 'mainframe',
-    title: 'Mainframe → Teradata',
-    subtitle: 'Mainframe jobs loading Teradata tables',
-    icon: FiServer,
-    jobsLabel: 'Mainframe jobs',
-    tablesLabel: 'Teradata tables loaded',
-    legend: [
-      { label: 'Mainframe JCL job', className: 'bg-indigo-800' },
-      { label: 'Teradata load job', className: 'bg-orange-700' },
-      { label: 'Mainframe dataset', className: 'bg-indigo-50 border-2 border-indigo-500' },
-      { label: 'Teradata table', className: 'bg-orange-50 border-2 border-orange-500' },
-    ],
-  },
-  HADOOP_ABINITIO: {
-    param: 'abinitio',
-    title: 'Ab Initio → Hadoop',
-    subtitle: 'Ab Initio graphs loading Hadoop tables',
-    icon: FiDatabase,
-    jobsLabel: 'Ab Initio graphs',
-    tablesLabel: 'Hadoop tables loaded',
-    legend: [
-      { label: 'Ab Initio graph', className: 'bg-teal-700' },
-      { label: 'HDFS / Hive table', className: 'bg-teal-50 border-2 border-teal-500' },
-    ],
-  },
-};
+interface LegendItem {
+  label: string;
+  className?: string;
+  style?: React.CSSProperties;
+}
 
-const statusLegend = [
+/** Legend for a platform's colors: plain jobs, load jobs, sources and its tables. */
+const platformLegend = (p: PlatformInfo): LegendItem[] => [
+  { label: p.job_label, style: { background: '#3730a3' } },
+  { label: `${p.job_label} loading ${p.table_label}s`, style: { background: p.color } },
+  { label: 'Source dataset / file', style: { background: '#f1f5f9', border: '2px solid #64748b' } },
+  { label: p.table_label, style: { background: `${p.color}1a`, border: `2px solid ${p.color}` } },
+];
+
+const statusLegend: LegendItem[] = [
   { label: 'Failed run', className: 'bg-white border-4 border-red-600' },
   { label: 'Running', className: 'bg-white border-4 border-dashed border-blue-400' },
   { label: 'Impacted by failure', className: 'bg-amber-300' },
@@ -100,9 +73,6 @@ const VIEWS: { mode: LineageView; label: string; hint: string }[] = [
   { mode: 'datasets', label: 'Jobs + tables', hint: 'Jobs and the tables/files they read and write' },
   { mode: 'databases', label: 'Databases', hint: 'Database-level lineage' },
 ];
-
-const platformFromParam = (value: string | null): LineagePlatform =>
-  value === PLATFORMS.HADOOP_ABINITIO.param ? 'HADOOP_ABINITIO' : 'MAINFRAME';
 
 const selectClass =
   'px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50';
@@ -119,8 +89,11 @@ interface ColumnSearchState {
 
 const JobLineagePage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const platform = platformFromParam(searchParams.get('platform'));
-  const platformInfo = PLATFORMS[platform];
+  const [platforms, setPlatforms] = useState<PlatformInfo[] | null>(null);
+  // ?platform=<folder key>, e.g. ?platform=mainframe; defaults to the first platform.
+  const platformKey = searchParams.get('platform');
+  const platformInfo = platforms?.find((p) => p.key === platformKey) || platforms?.[0] || null;
+  const platform = platformInfo?.id || '';
 
   const [tab, setTab] = useState<'lineage' | 'sla'>('lineage');
   const [graph, setGraph] = useState<JobLineageGraph | null>(null);
@@ -140,7 +113,22 @@ const JobLineagePage: React.FC = () => {
   const [columnDirection, setColumnDirection] = useState<LineageDirection>('both');
   const [columnLineage, setColumnLineage] = useState<ColumnLineageGraph | null>(null);
 
+  const loadPlatforms = useCallback(async () => {
+    try {
+      setPlatforms(await getLineagePlatforms());
+    } catch (error) {
+      toast.error('Failed to load platforms');
+      console.error(error);
+      setPlatforms([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPlatforms();
+  }, [loadPlatforms]);
+
   const loadGraph = useCallback(async () => {
+    if (!platform) return;
     try {
       setLoading(true);
       const data = await getJobLineageGraph({
@@ -163,7 +151,7 @@ const JobLineagePage: React.FC = () => {
   }, [loadGraph]);
 
   useEffect(() => {
-    if (!columnFocus) {
+    if (!columnFocus || !platform) {
       setColumnLineage(null);
       return;
     }
@@ -211,11 +199,9 @@ const JobLineagePage: React.FC = () => {
       setSyncing(true);
       const stats = await syncJobLineage();
       const from = stats.source?.startsWith('files:') ? 'input files' : 'sample data';
-      toast.success(
-        `Synced ${stats.mainframe.jobs_created + stats.mainframe.jobs_updated} mainframe jobs, ` +
-          `${stats.abinitio.jobs_created + stats.abinitio.jobs_updated} Ab Initio graphs from ${from}`
-      );
-      await loadGraph();
+      const count = Object.keys(stats.platforms || {}).length;
+      toast.success(`Synced ${stats.jobs_synced} jobs across ${count} platforms from ${from}`);
+      await Promise.all([loadGraph(), loadPlatforms()]);
       setSlaRefresh((n) => n + 1);
     } catch (error: any) {
       // A bad input file comes back as a 400 naming the file, line and problem.
@@ -279,12 +265,12 @@ const JobLineagePage: React.FC = () => {
     }
   };
 
-  const handlePlatformChange = (next: LineagePlatform) => {
-    if (next === platform) return;
+  const handlePlatformChange = (next: PlatformInfo) => {
+    if (next.id === platform) return;
     setFocus(null);
     resetSelection();
     setColumnSearch(null);
-    setSearchParams({ platform: PLATFORMS[next].param });
+    setSearchParams({ platform: next.key });
   };
 
   const handleViewChange = (mode: LineageView) => {
@@ -331,7 +317,7 @@ const JobLineagePage: React.FC = () => {
         onShowImpact={handleShowImpact}
         onSelect={(id) => handleSelect(id)}
         onClose={() => handleSelect(null)}
-        platform={platform}
+        platform={platformInfo!}
         onColumnSelect={openColumnLineage}
       />
     );
@@ -343,6 +329,17 @@ const JobLineagePage: React.FC = () => {
       ? dbView.databaseOf.get(focus) || null
       : focus;
   const focusedColumn = columnLineage?.focus;
+
+  if (!platforms) {
+    return <div className="p-12 text-center text-gray-500">Loading platforms…</div>;
+  }
+  if (!platformInfo) {
+    return (
+      <div className="p-12 text-center text-gray-600">
+        No platforms are configured. Add them to platforms.csv in the lineage data folder.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -364,26 +361,36 @@ const JobLineagePage: React.FC = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4" role="tablist" aria-label="Platform">
-        {(Object.keys(PLATFORMS) as LineagePlatform[]).map((p) => {
-          const info = PLATFORMS[p];
-          const Icon = info.icon;
-          const active = p === platform;
+      <div
+        className="grid gap-3"
+        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))' }}
+        role="tablist"
+        aria-label="Platform"
+      >
+        {platforms.map((p) => {
+          const active = p.id === platform;
           return (
             <button
-              key={p}
+              key={p.id}
               role="tab"
               aria-selected={active}
               onClick={() => handlePlatformChange(p)}
-              className={`flex items-center gap-4 p-5 rounded-lg border-2 text-left transition ${
+              className={`relative flex flex-col gap-1 p-4 pl-5 rounded-lg border-2 text-left transition overflow-hidden ${
                 active ? 'border-indigo-600 bg-indigo-50 shadow' : 'border-gray-200 bg-white hover:border-indigo-300'
               }`}
             >
-              <Icon size={28} className={active ? 'text-indigo-600' : 'text-gray-400'} />
-              <div>
-                <p className={`text-lg font-bold ${active ? 'text-indigo-900' : 'text-gray-800'}`}>{info.title}</p>
-                <p className="text-sm text-gray-600">{info.subtitle}</p>
-              </div>
+              <span className="absolute left-0 inset-y-0 w-1.5" style={{ background: p.color }} aria-hidden="true" />
+              <span className={`font-bold ${active ? 'text-indigo-900' : 'text-gray-800'}`}>{p.name}</span>
+              <span className="text-xs text-gray-600">{p.description}</span>
+              <span className="flex flex-wrap items-center gap-1.5 mt-1 text-xs">
+                <span className="text-gray-600">{p.summary.jobs} jobs</span>
+                {p.summary.failed > 0 && (
+                  <span className="px-1.5 rounded bg-red-100 text-red-800 font-semibold">{p.summary.failed} failed</span>
+                )}
+                {p.summary.sla_late > 0 && (
+                  <span className="px-1.5 rounded bg-red-600 text-white font-semibold">{p.summary.sla_late} late</span>
+                )}
+              </span>
             </button>
           );
         })}
@@ -391,8 +398,8 @@ const JobLineagePage: React.FC = () => {
 
       {summary && (
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-          <StatCard title={platformInfo.jobsLabel} value={summary.jobs} icon={platformInfo.icon} color="indigo" />
-          <StatCard title={platformInfo.tablesLabel} value={summary.tables_loaded} icon={FiGrid} color="green" />
+          <StatCard title={`${platformInfo.job_label}s`} value={summary.jobs} icon={FiServer} color="indigo" />
+          <StatCard title={`${platformInfo.table_label}s loaded`} value={summary.tables_loaded} icon={FiGrid} color="green" />
           <StatCard title="Failed jobs" value={summary.failed_jobs.length} icon={FiAlertOctagon} color="red" />
           <StatCard title="Running" value={summary.running_jobs.length} icon={FiPlayCircle} color="blue" />
           <StatCard title="Impacted downstream" value={summary.impacted_jobs} icon={FiZap} color="orange" />
@@ -468,7 +475,7 @@ const JobLineagePage: React.FC = () => {
               <button onClick={() => setSearchMode('column')} className={segment(searchMode === 'column')}>Column</button>
             </div>
             {searchMode === 'table' ? (
-              <TableSearch platform={platform} onSelect={(t: LineageTableResult) => showTableLineage(t.id)} />
+              <TableSearch platform={platform} tableLabel={platformInfo.table_label} onSelect={(t: LineageTableResult) => showTableLineage(t.id)} />
             ) : (
               <ColumnSearch platform={platform} onSearch={runColumnSearch} />
             )}
@@ -513,7 +520,7 @@ const JobLineagePage: React.FC = () => {
 
           {isEmpty ? (
             <div className="bg-white rounded-lg shadow p-12 text-center text-gray-600">
-              No {platformInfo.jobsLabel.toLowerCase()} in the catalog yet. Click "Sync job metadata" to load them.
+              No {platformInfo.job_label}s in the catalog yet. Click "Sync job metadata" to load them.
             </div>
           ) : (
             <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -553,6 +560,7 @@ const JobLineagePage: React.FC = () => {
                       selectedId={selectedId}
                       highlightIds={highlightIds}
                       centerId={centerId}
+                      color={platformInfo.color}
                       onSelect={handleSelect}
                     />
                   )}
@@ -564,9 +572,9 @@ const JobLineagePage: React.FC = () => {
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 border-t border-gray-200">
-                {[...platformInfo.legend, ...statusLegend].map((l) => (
+                {[...platformLegend(platformInfo), ...statusLegend].map((l) => (
                   <span key={l.label} className="flex items-center gap-2 text-xs text-gray-600">
-                    <span className={`inline-block w-4 h-3 rounded-sm ${l.className}`} />
+                    <span className={`inline-block w-4 h-3 rounded-sm ${l.className || ''}`} style={l.style} />
                     {l.label}
                   </span>
                 ))}

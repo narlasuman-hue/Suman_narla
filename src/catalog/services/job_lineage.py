@@ -1,15 +1,17 @@
-"""Job lineage for two independent platforms.
+"""Job lineage for independent, configured platforms.
 
-* ``MAINFRAME``: mainframe JCL jobs, which load Teradata tables
-  (BTEQ / FastLoad / MultiLoad) from mainframe datasets;
-* ``HADOOP_ABINITIO``: Ab Initio graphs, which load Hadoop (Hive / HDFS) tables.
-
-Lineage is always built for one platform at a time from the catalog's
-``Job`` / ``JobFile`` rows:
+A platform (see ``src/catalog/platforms.py``) is one world of jobs and the
+tables they load, e.g. mainframe jobs loading Teradata tables, Ab Initio graphs
+loading Hive tables, or Airflow tasks loading Snowflake tables. Lineage is
+always built for one platform at a time from the catalog's ``Job`` / ``JobFile``
+rows:
 
 * job nodes: the platform's jobs;
 * dataset nodes: the datasets/tables those jobs read and write;
 * edges: ``dataset -> job`` for inputs and ``job -> dataset`` for outputs.
+
+A dataset whose ``dataset_type`` is one of the platform's ``table_types`` is a
+*table* (``is_table``); a job that writes a table is a *load* job (``LOAD``).
 
 For SRE triage, every node downstream of a job whose latest run failed is
 flagged as impacted (the failure's blast radius).
@@ -22,22 +24,11 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 from sqlalchemy.orm import Session, selectinload
 
 from src.catalog.models import Job
+from src.catalog.platforms import Platform, get_platform
 from src.catalog.services.job_runs import RUN_FAILED, RUN_RUNNING
 from src.catalog.services.sla import COMPLETED_LATE, LATE, MET, SEVERITY, evaluate_sla
 
-PLATFORM_LABELS = {
-    "MAINFRAME": "Mainframe / Teradata",
-    "HADOOP_ABINITIO": "Hadoop / Ab Initio",
-}
 DIRECTIONS = ("upstream", "downstream", "both")
-
-# The tables each platform loads: Teradata tables for mainframe jobs,
-# Hive/HDFS tables for Ab Initio graphs.
-TABLE_PLATFORM = {"MAINFRAME": "TERADATA", "HADOOP_ABINITIO": "HADOOP"}
-
-# Where a dataset lives, by dataset_type. Anything else (PS, VSAM, GDG, PDS...)
-# is a mainframe dataset.
-_DATASET_PLATFORM = {"TERADATA": "TERADATA", "HIVE": "HADOOP", "HDFS": "HADOOP"}
 
 Graph = Tuple[Dict[str, Dict[str, Any]], List[Dict[str, Any]]]
 
@@ -54,24 +45,27 @@ def dataset_node_id(dataset_name: str) -> str:
     return f"dataset:{name}"
 
 
-def database_of(dataset_name: str, dataset_type: Optional[str]) -> str:
+def database_of(dataset_name: str, is_table: bool) -> str:
     """The database a dataset belongs to, for database-level lineage.
 
-    * Teradata / Hive ``DB.TABLE`` -> ``DB``
-    * HDFS ``/data/raw/cards/auth`` -> zone ``/data/raw``
-    * Mainframe DSN ``PROD.PAYROLL.GL.EXTRACT`` -> qualifiers ``PROD.PAYROLL``
+    * Table ``DB.TABLE`` -> ``DB``; ``DB.SCHEMA.TABLE`` (e.g. Snowflake) -> ``DB.SCHEMA``
+    * Path ``/data/raw/cards/auth`` -> zone ``/data/raw``
+    * URL ``s3://lake/events/`` -> bucket ``s3://lake``; ``salesforce://Account`` -> ``salesforce``
+    * Mainframe DSN ``PROD.PAYROLL.GL.EXTRACT`` -> high-level qualifiers ``PROD.PAYROLL``
+    * Other ``SCHEMA.TABLE`` sources (e.g. ``CRM.CUSTOMERS``) -> ``CRM``
     """
     name = dataset_name.strip()
+    if "://" in name:
+        scheme, rest = name.split("://", 1)
+        parts = [p for p in rest.split("/") if p]
+        return f"{scheme}://{parts[0]}" if len(parts) > 1 else scheme
     if name.startswith("/"):
         parts = [p for p in name.split("/") if p]
         return "/" + "/".join(parts[:2])
-    kind = (dataset_type or "").upper()
-    if kind in ("TERADATA", "HIVE"):
-        database = name.split(".")[0]
-        # Teradata names are conventionally upper case, Hive lower case.
-        return database.upper() if kind == "TERADATA" else database.lower()
-    qualifiers = name.upper().split(".")
-    return ".".join(qualifiers[:2])
+    if is_table:
+        return name.rsplit(".", 1)[0] if "." in name else name
+    qualifiers = name.split(".")
+    return ".".join(qualifiers[:2]) if len(qualifiers) > 2 else qualifiers[0]
 
 
 def job_node_id(job_id: int) -> str:
@@ -82,15 +76,13 @@ def _iso(value) -> Optional[str]:
     return value.isoformat() if value else None
 
 
-def _job_type(job: Job) -> str:
-    if job.source_system == "HADOOP_ABINITIO":
-        return "AB_INITIO_GRAPH"
-    writes_teradata = any(
-        (f.dataset_type or "").upper() == "TERADATA"
-        and (f.direction or "").upper() in ("OUTPUT", "INOUT")
+def _job_type(job: Job, platform: Platform) -> str:
+    """``LOAD`` if the job writes one of the platform's tables, else ``JOB``."""
+    writes_table = any(
+        platform.is_table(f.dataset_type) and (f.direction or "").upper() in ("OUTPUT", "INOUT")
         for f in job.files
     )
-    return "TERADATA_LOAD" if writes_teradata else "JCL"
+    return "LOAD" if writes_table else "JOB"
 
 
 class JobLineageService:
@@ -102,8 +94,7 @@ class JobLineageService:
     # ---------- graph construction ----------
 
     def _load(self, platform: str, now: Optional[datetime] = None) -> Graph:
-        if platform not in PLATFORM_LABELS:
-            raise ValueError(f"Unknown platform: {platform}")
+        config = get_platform(platform)  # ValueError for an unknown platform
         jobs = (
             self.db.query(Job)
             .options(
@@ -127,8 +118,8 @@ class JobLineageService:
                 "catalog_id": job.id,
                 "name": job.name,
                 "platform": job.source_system,
-                "platform_label": PLATFORM_LABELS[job.source_system],
-                "job_type": _job_type(job),
+                "platform_label": config.name,
+                "job_type": _job_type(job, config),
                 "owner": job.owner,
                 "description": job.description,
                 "scheduler_system": job.scheduler_system,
@@ -147,6 +138,7 @@ class JobLineageService:
             for f in job.files:
                 did = dataset_node_id(f.dataset_name)
                 dataset_type = (f.dataset_type or "").upper() or None
+                is_table = config.is_table(dataset_type)
                 nodes.setdefault(
                     did,
                     {
@@ -154,8 +146,8 @@ class JobLineageService:
                         "type": "dataset",
                         "name": f.dataset_name.strip(),
                         "dataset_type": dataset_type,
-                        "platform": _DATASET_PLATFORM.get(dataset_type or "", "MAINFRAME"),
-                        "database": database_of(f.dataset_name, dataset_type),
+                        "is_table": is_table,
+                        "database": database_of(f.dataset_name, is_table),
                     },
                 )
                 direction = (f.direction or "").upper()
@@ -267,9 +259,7 @@ class JobLineageService:
         tables = [
             n
             for n in nodes.values()
-            if n["type"] == "dataset"
-            and n["platform"] == TABLE_PLATFORM[platform]
-            and needle in n["name"].lower()
+            if n["type"] == "dataset" and n["is_table"] and needle in n["name"].lower()
         ]
         # Exact and prefix matches first, then alphabetical.
         tables.sort(
@@ -381,11 +371,11 @@ class JobLineageService:
         written = {e["target"] for e in edges}
         return {
             "jobs": len(jobs),
-            # Teradata tables (mainframe) or Hive/HDFS tables (Ab Initio) a job loads
+            # The platform's tables (per its table_types) that some job loads
             "tables_loaded": sum(
                 1
                 for nid, n in nodes.items()
-                if n["type"] == "dataset" and n["platform"] != "MAINFRAME" and nid in written
+                if n["type"] == "dataset" and n["is_table"] and nid in written
             ),
             "datasets": sum(1 for n in nodes.values() if n["type"] == "dataset"),
             "failed_jobs": [j["name"] for j in jobs if j["run_status"] == RUN_FAILED],

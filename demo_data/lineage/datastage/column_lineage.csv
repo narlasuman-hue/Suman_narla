@@ -1,0 +1,40 @@
+job_name,source_dataset,source_column,target_dataset,target_column,transformation
+dsj_ext_claims,/data/in/claims/claims_daily.dat,CLM_NO,STAGE.CLAIMS_STG,CLAIM_ID,
+dsj_ext_claims,/data/in/claims/claims_daily.dat,MBR_ID,STAGE.CLAIMS_STG,MEMBER_ID,
+dsj_ext_claims,/data/in/claims/claims_daily.dat,NPI,STAGE.CLAIMS_STG,PROVIDER_NPI,
+dsj_ext_claims,/data/in/claims/claims_daily.dat,SVC_DT,STAGE.CLAIMS_STG,SERVICE_DATE,"StringToDate(SVC_DT, '%yyyy%mm%dd')"
+dsj_ext_claims,/data/in/claims/claims_daily.dat,BILLED_AMT,STAGE.CLAIMS_STG,BILLED_AMOUNT,StringToDecimal(BILLED_AMT)
+dsj_ext_claims,/data/in/claims/claims_daily.dat,DX_CD,STAGE.CLAIMS_STG,DIAGNOSIS_CODE,Trim(DX_CD)
+dsj_ext_members,/data/in/members/members_daily.dat,MBR_ID,STAGE.MEMBERS_STG,MEMBER_ID,
+dsj_ext_members,/data/in/members/members_daily.dat,MBR_NAME,STAGE.MEMBERS_STG,MEMBER_NAME,Trim(MBR_NAME)
+dsj_ext_members,/data/in/members/members_daily.dat,DOB,STAGE.MEMBERS_STG,BIRTH_DATE,"StringToDate(DOB, '%yyyy%mm%dd')"
+dsj_ext_members,/data/in/members/members_daily.dat,PLAN_CD,STAGE.MEMBERS_STG,PLAN_CODE,
+dsj_load_member_dim,STAGE.MEMBERS_STG,MEMBER_ID,EDW.MEMBER_DIM,MEMBER_ID,
+dsj_load_member_dim,STAGE.MEMBERS_STG,MEMBER_NAME,EDW.MEMBER_DIM,MEMBER_NAME,
+dsj_load_member_dim,STAGE.MEMBERS_STG,PLAN_CODE,EDW.MEMBER_DIM,PLAN_CODE,
+dsj_load_member_dim,STAGE.MEMBERS_STG,MEMBER_ID,EDW.MEMBER_DIM,MEMBER_KEY,"Surrogate key generator, keyed on MEMBER_ID"
+dsj_load_provider_dim,/data/in/providers/npi_extract.dat,NPI,EDW.PROVIDER_DIM,PROVIDER_NPI,
+dsj_load_provider_dim,/data/in/providers/npi_extract.dat,NPI,EDW.PROVIDER_DIM,PROVIDER_KEY,"Surrogate key generator, keyed on NPI"
+dsj_load_provider_dim,/data/in/providers/npi_extract.dat,PROVIDER_NAME,EDW.PROVIDER_DIM,PROVIDER_NAME,Trim(PROVIDER_NAME)
+dsj_load_provider_dim,/data/in/providers/npi_extract.dat,SPECIALTY,EDW.PROVIDER_DIM,SPECIALTY,
+dsj_load_claim_fact,STAGE.CLAIMS_STG,CLAIM_ID,EDW.CLAIM_FACT,CLAIM_ID,
+dsj_load_claim_fact,STAGE.CLAIMS_STG,SERVICE_DATE,EDW.CLAIM_FACT,SERVICE_DATE,
+dsj_load_claim_fact,STAGE.CLAIMS_STG,BILLED_AMOUNT,EDW.CLAIM_FACT,BILLED_AMOUNT,
+dsj_load_claim_fact,STAGE.CLAIMS_STG,DIAGNOSIS_CODE,EDW.CLAIM_FACT,DIAGNOSIS_CODE,
+dsj_load_claim_fact,STAGE.CLAIMS_STG,CLAIM_ID,EDW.CLAIM_FACT,CLAIM_KEY,Surrogate key generator
+dsj_load_claim_fact,EDW.MEMBER_DIM,MEMBER_KEY,EDW.CLAIM_FACT,MEMBER_KEY,Lookup on MEMBER_ID
+dsj_load_claim_fact,EDW.PROVIDER_DIM,PROVIDER_KEY,EDW.CLAIM_FACT,PROVIDER_KEY,Lookup on PROVIDER_NPI
+dsj_build_claims_mart,EDW.CLAIM_FACT,SERVICE_DATE,MART.CLAIMS_SUMMARY,SERVICE_MONTH,First day of month(SERVICE_DATE)
+dsj_build_claims_mart,EDW.MEMBER_DIM,PLAN_CODE,MART.CLAIMS_SUMMARY,PLAN_CODE,Join on MEMBER_KEY
+dsj_build_claims_mart,EDW.PROVIDER_DIM,SPECIALTY,MART.CLAIMS_SUMMARY,SPECIALTY,Join on PROVIDER_KEY
+dsj_build_claims_mart,EDW.CLAIM_FACT,CLAIM_KEY,MART.CLAIMS_SUMMARY,CLAIM_COUNT,COUNT(CLAIM_KEY)
+dsj_build_claims_mart,EDW.CLAIM_FACT,BILLED_AMOUNT,MART.CLAIMS_SUMMARY,TOTAL_BILLED,SUM(BILLED_AMOUNT)
+dsj_exp_regulatory,MART.CLAIMS_SUMMARY,SERVICE_MONTH,/data/out/regulatory/claims_report.dat,SERVICE_MONTH,"DateToString(SERVICE_MONTH, '%yyyy-%mm')"
+dsj_exp_regulatory,MART.CLAIMS_SUMMARY,PLAN_CODE,/data/out/regulatory/claims_report.dat,PLAN_CODE,
+dsj_exp_regulatory,MART.CLAIMS_SUMMARY,CLAIM_COUNT,/data/out/regulatory/claims_report.dat,CLAIM_COUNT,SUM over SPECIALTY
+dsj_exp_regulatory,MART.CLAIMS_SUMMARY,TOTAL_BILLED,/data/out/regulatory/claims_report.dat,TOTAL_BILLED,SUM over SPECIALTY
+dsj_ext_pharmacy,/data/in/rx/pharmacy_claims.dat,RX_CLM_NO,STAGE.RX_CLAIMS_STG,RX_CLAIM_ID,
+dsj_ext_pharmacy,/data/in/rx/pharmacy_claims.dat,MBR_ID,STAGE.RX_CLAIMS_STG,MEMBER_ID,
+dsj_ext_pharmacy,/data/in/rx/pharmacy_claims.dat,NDC,STAGE.RX_CLAIMS_STG,NDC_CODE,
+dsj_ext_pharmacy,/data/in/rx/pharmacy_claims.dat,FILL_DT,STAGE.RX_CLAIMS_STG,FILL_DATE,"StringToDate(FILL_DT, '%yyyy%mm%dd')"
+dsj_ext_pharmacy,/data/in/rx/pharmacy_claims.dat,PAID_AMT,STAGE.RX_CLAIMS_STG,PAID_AMOUNT,StringToDecimal(PAID_AMT)

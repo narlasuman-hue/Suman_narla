@@ -1,17 +1,17 @@
-"""File-based job lineage connectors (CSV input files).
+"""File-based job lineage connector (CSV input files).
 
 Lets the Job Lineage UI run from hand-made input files when there is no
-access to the production mainframe scheduler or Ab Initio metadata, e.g.
-for demos. The files live in one directory (``settings.lineage_data_dir``)::
+access to production schedulers or metadata, e.g. for demos. The files live
+in one directory (``settings.lineage_data_dir``)::
 
-    mainframe/jobs.csv            one row per mainframe job
-    mainframe/job_datasets.csv    one row per dataset/table a job reads or writes
-    mainframe/table_columns.csv   optional: columns of each dataset/table
-    mainframe/column_lineage.csv  optional: source column -> target column per job
-    abinitio/graphs.csv           one row per Ab Initio graph
-    abinitio/graph_datasets.csv   one row per dataset/table a graph reads or writes
-    abinitio/table_columns.csv    optional: columns of each dataset/table
-    abinitio/column_lineage.csv   optional: source column -> target column per graph
+    platforms.csv                 one row per platform (see src/catalog/platforms.py)
+    <folder>/jobs.csv             one row per job
+    <folder>/job_datasets.csv     one row per dataset/table a job reads or writes
+    <folder>/table_columns.csv    optional: columns of each dataset/table
+    <folder>/column_lineage.csv   optional: source column -> target column per job
+
+``graphs.csv`` / ``graph_datasets.csv`` with ``graph_name`` are accepted in place
+of ``jobs.csv`` / ``job_datasets.csv`` with ``job_name`` (the Ab Initio folder).
 
 See ``docs/JOB_LINEAGE_DEMO_DATA.md`` for the columns. Timestamps accept ISO
 format (``2026-10-07T01:00``) or an offset from now (``-9h``, ``+15h``,
@@ -24,15 +24,13 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
-from src.connectors.abinitio import BaseAbInitioConnector
-from src.connectors.mainframe import BaseMainframeConnector
+from src.catalog.platforms import DEFAULT_PLATFORMS, PLATFORMS_FILE
+from src.connectors.base_lineage import BaseLineageConnector
 
-MAINFRAME_JOBS = "mainframe/jobs.csv"
-MAINFRAME_DATASETS = "mainframe/job_datasets.csv"
-ABINITIO_GRAPHS = "abinitio/graphs.csv"
-ABINITIO_DATASETS = "abinitio/graph_datasets.csv"
-TABLE_COLUMNS = "table_columns.csv"  # under mainframe/ or abinitio/
-COLUMN_LINEAGE = "column_lineage.csv"  # under mainframe/ or abinitio/
+JOBS_FILES = ("jobs.csv", "graphs.csv")  # per platform folder
+TABLE_COLUMNS = "table_columns.csv"
+COLUMN_LINEAGE = "column_lineage.csv"
+PORT_COLUMNS = ("port", "dd_name", "step")  # whichever the datasets file uses
 
 RUN_STATUSES = ("SUCCESS", "FAILED", "RUNNING")
 DIRECTIONS = ("INPUT", "OUTPUT", "INOUT")
@@ -113,7 +111,6 @@ def _load(
     datasets_file: str,
     name_col: str,
     job_columns: Sequence[str],
-    port_col: str,
 ) -> Dict[str, Dict[str, Any]]:
     """Load a jobs file and its datasets file into ``{name: job_dict}``."""
     jobs_path, ds_path = base / jobs_file, base / datasets_file
@@ -160,7 +157,7 @@ def _load(
             raise LineageFileError(f"{ds_path} line {line}: dataset_name is empty")
         job["datasets"].append(
             {
-                "port": row.get(port_col) or None,
+                "port": next((row[c] for c in PORT_COLUMNS if row.get(c)), None),
                 "dataset_name": row["dataset_name"],
                 "direction": _choice(ds_path, line, "direction", row["direction"], DIRECTIONS),
                 "dataset_type": row["dataset_type"].upper() or None,
@@ -241,30 +238,53 @@ def _load_column_lineage(
         )
 
 
+def _first_existing(base: Path, folder: str, names: Sequence[str]) -> Optional[str]:
+    for name in names:
+        if (base / folder / name).is_file():
+            return f"{folder}/{name}"
+    return None
+
+
 def has_lineage_files(data_dir: str) -> bool:
-    """True when ``data_dir`` holds the input files (so they should be used)."""
+    """True when ``data_dir`` holds input files (so they should be used)."""
     base = Path(data_dir)
-    return (base / MAINFRAME_JOBS).is_file() or (base / ABINITIO_GRAPHS).is_file()
+    if (base / PLATFORMS_FILE).is_file():
+        return True
+    return any(
+        _first_existing(base, p.folder, JOBS_FILES) for p in DEFAULT_PLATFORMS
+    )
 
 
-class CsvMainframeConnector(BaseMainframeConnector):
-    """Mainframe jobs (including Teradata load jobs) read from CSV files."""
+class CsvLineageConnector(BaseLineageConnector):
+    """Jobs, datasets, columns and column mappings of one platform, from CSV files.
 
-    JOB_COLUMNS = ("job_name", "scheduler_system", "schedule_name", "last_run_status")
+    Reads ``<data_dir>/<folder>/``: ``jobs.csv`` + ``job_datasets.csv`` (key column
+    ``job_name``), or the Ab Initio naming ``graphs.csv`` + ``graph_datasets.csv``
+    (``graph_name``); plus the optional ``table_columns.csv`` and ``column_lineage.csv``.
+    """
 
-    def __init__(self, data_dir: str):
+    def __init__(self, data_dir: str, folder: str):
         self.data_dir = Path(data_dir)
+        self.folder = folder
         self._jobs: Dict[str, Dict[str, Any]] = {}
         self._columns: List[Dict[str, Any]] = []
         self._connected = False
 
     def connect(self) -> None:
-        self._jobs = _load(
-            self.data_dir, MAINFRAME_JOBS, MAINFRAME_DATASETS, "job_name",
-            self.JOB_COLUMNS, "dd_name",
-        )
-        _load_column_lineage(self.data_dir / "mainframe" / COLUMN_LINEAGE, self._jobs, "job_name")
-        self._columns = _load_table_columns(self.data_dir / "mainframe" / TABLE_COLUMNS)
+        jobs_file = _first_existing(self.data_dir, self.folder, JOBS_FILES)
+        if jobs_file is None:
+            raise LineageFileError(
+                f"{self.data_dir / self.folder}: no jobs file (expected jobs.csv)"
+            )
+        uses_graphs = jobs_file.endswith("graphs.csv")
+        name_col = "graph_name" if uses_graphs else "job_name"
+        datasets_name = "graph_datasets.csv" if uses_graphs else "job_datasets.csv"
+        datasets_file = f"{self.folder}/{datasets_name}"
+        required = (name_col, "scheduler_system", "schedule_name", "last_run_status")
+
+        self._jobs = _load(self.data_dir, jobs_file, datasets_file, name_col, required)
+        _load_column_lineage(self.data_dir / self.folder / COLUMN_LINEAGE, self._jobs, name_col)
+        self._columns = _load_table_columns(self.data_dir / self.folder / TABLE_COLUMNS)
         self._connected = True
 
     def disconnect(self) -> None:
@@ -275,113 +295,36 @@ class CsvMainframeConnector(BaseMainframeConnector):
 
     def _get(self, job_name: str) -> Dict[str, Any]:
         if job_name not in self._jobs:
-            raise KeyError(f"Unknown mainframe job: {job_name}")
+            raise KeyError(f"Unknown job: {job_name}")
         return self._jobs[job_name]
 
-    def get_jobs(self) -> List[Dict[str, Any]]:
-        return [{"job_name": name} for name in self._jobs]
+    def get_jobs(self) -> List[str]:
+        return list(self._jobs)
 
     def get_job_details(self, job_name: str) -> Dict[str, Any]:
         job = self._get(job_name)
         return {
-            "job_name": job_name,
+            "name": job_name,
             "owner": job.get("owner") or None,
-            "job_class": job.get("job_class") or None,
             "description": job.get("description") or None,
-            "status": job["last_run_status"],
+            "job_class": job.get("job_class") or None,
             "last_run_status": job["last_run_status"],
             "last_run": job["last_run"],
             "next_run": job["next_run"],
-            "return_code": job.get("return_code") or None,
             "duration_seconds": job["duration_seconds"],
+            # Mainframe files say return_code, the others error_message.
+            "error_message": job.get("error_message") or job.get("return_code") or None,
             "expected_completion": job["expected_completion"],
+            "scheduler_system": job.get("scheduler_system") or None,
+            "schedule_name": job.get("schedule_name") or None,
+            "frequency": job.get("frequency") or None,
         }
+
+    def get_job_datasets(self, job_name: str) -> List[Dict[str, Any]]:
+        return self._get(job_name)["datasets"]
 
     def get_table_columns(self) -> List[Dict[str, Any]]:
         return self._columns
 
     def get_job_column_lineage(self, job_name: str) -> List[Dict[str, Any]]:
         return self._get(job_name)["column_mappings"]
-
-    def get_job_files(self, job_name: str) -> List[Dict[str, Any]]:
-        return [
-            {**{k: v for k, v in ds.items() if k != "port"}, "dd_name": ds["port"]}
-            for ds in self._get(job_name)["datasets"]
-        ]
-
-    def get_job_schedule(self, job_name: str) -> Dict[str, Any]:
-        job = self._get(job_name)
-        return {
-            "scheduler_system": job.get("scheduler_system") or None,
-            "schedule_name": job.get("schedule_name") or None,
-            "frequency": job.get("frequency") or None,
-        }
-
-
-class CsvAbInitioConnector(BaseAbInitioConnector):
-    """Ab Initio graphs (loading Hadoop tables) read from CSV files."""
-
-    JOB_COLUMNS = ("graph_name", "scheduler_system", "schedule_name", "last_run_status")
-
-    def __init__(self, data_dir: str):
-        self.data_dir = Path(data_dir)
-        self._graphs: Dict[str, Dict[str, Any]] = {}
-        self._columns: List[Dict[str, Any]] = []
-        self._connected = False
-
-    def connect(self) -> None:
-        self._graphs = _load(
-            self.data_dir, ABINITIO_GRAPHS, ABINITIO_DATASETS, "graph_name",
-            self.JOB_COLUMNS, "port",
-        )
-        _load_column_lineage(
-            self.data_dir / "abinitio" / COLUMN_LINEAGE, self._graphs, "graph_name"
-        )
-        self._columns = _load_table_columns(self.data_dir / "abinitio" / TABLE_COLUMNS)
-        self._connected = True
-
-    def disconnect(self) -> None:
-        self._connected = False
-
-    def is_connected(self) -> bool:
-        return self._connected
-
-    def _get(self, graph_name: str) -> Dict[str, Any]:
-        if graph_name not in self._graphs:
-            raise KeyError(f"Unknown Ab Initio graph: {graph_name}")
-        return self._graphs[graph_name]
-
-    def get_graphs(self) -> List[Dict[str, Any]]:
-        return [{"graph_name": name} for name in self._graphs]
-
-    def get_graph_details(self, graph_name: str) -> Dict[str, Any]:
-        graph = self._get(graph_name)
-        return {
-            "graph_name": graph_name,
-            "project": graph.get("project") or None,
-            "owner": graph.get("owner") or None,
-            "description": graph.get("description") or None,
-            "last_run_status": graph["last_run_status"],
-            "last_run": graph["last_run"],
-            "next_run": graph["next_run"],
-            "duration_seconds": graph["duration_seconds"],
-            "error_message": graph.get("error_message") or None,
-            "expected_completion": graph["expected_completion"],
-        }
-
-    def get_table_columns(self) -> List[Dict[str, Any]]:
-        return self._columns
-
-    def get_graph_column_lineage(self, graph_name: str) -> List[Dict[str, Any]]:
-        return self._get(graph_name)["column_mappings"]
-
-    def get_graph_datasets(self, graph_name: str) -> List[Dict[str, Any]]:
-        return self._get(graph_name)["datasets"]
-
-    def get_graph_schedule(self, graph_name: str) -> Dict[str, Any]:
-        graph = self._get(graph_name)
-        return {
-            "scheduler_system": graph.get("scheduler_system") or None,
-            "schedule_name": graph.get("schedule_name") or None,
-            "frequency": graph.get("frequency") or None,
-        }

@@ -2,27 +2,55 @@
 
 Without production access, the Job Lineage UI can run from **CSV files** that
 describe your jobs and the tables they load. You can edit them in Excel or any text
-editor. There are four required files and four optional ones, which add column-level
-lineage and column search.
+editor. `platforms.csv` lists the platforms; each platform has a folder with two
+required files and two optional ones, which add column-level lineage and column search.
 
 ```
 demo_data/lineage/
+├── platforms.csv            one row per platform (see "0. platforms.csv" below)
 ├── mainframe/
 │   ├── jobs.csv             one row per mainframe job (incl. SLA expected completion)
 │   ├── job_datasets.csv     one row per file/table a mainframe job reads or writes
 │   ├── table_columns.csv    optional: the columns of each file/table
 │   └── column_lineage.csv   optional: source column → target column, per job
-└── abinitio/
-    ├── graphs.csv           one row per Ab Initio graph (incl. SLA expected completion)
-    ├── graph_datasets.csv   one row per file/table a graph reads or writes
-    ├── table_columns.csv    optional: the columns of each table/path
-    └── column_lineage.csv   optional: source column → target column, per graph
+├── abinitio/
+│   ├── graphs.csv           one row per Ab Initio graph (incl. SLA expected completion)
+│   ├── graph_datasets.csv   one row per file/table a graph reads or writes
+│   ├── table_columns.csv    optional: the columns of each table/path
+│   └── column_lineage.csv   optional: source column → target column, per graph
+├── informatica/             Informatica → Oracle  ┐
+├── airflow/                 Airflow → Snowflake   ├ same four files as mainframe/
+└── datastage/               DataStage → DB2       ┘
 ```
 
-The repo already contains a filled-in demo set: 13 mainframe jobs and 11 Ab Initio
-graphs for a banking scenario, with failures, a running job and downstream impact
-on each platform. You can use the files as they are, or edit them to match your
-own jobs.
+The repo already contains a filled-in demo set for five platforms: 13 mainframe jobs
+and 11 Ab Initio graphs (banking), 8 Informatica workflows (retail), 9 Airflow tasks
+(SaaS analytics) and 8 DataStage jobs (health claims). Each platform has failures, a
+running job, downstream impact and late SLAs. You can use the files as they are, or
+edit them to match your own jobs.
+
+## 0. `platforms.csv`: the platforms the UI offers
+
+One row per platform. Adding a row and a folder adds a platform to the UI: no code changes.
+
+| Column | Required | Example | Notes |
+|---|---|---|---|
+| `platform_id` | yes | `AIRFLOW_SNOWFLAKE` | Upper-case letters, digits, `_`. Unique |
+| `folder` | yes | `airflow` | Lower-case sub-folder with the platform's CSVs; also the `?platform=` URL key. Unique |
+| `name` | yes | `Airflow → Snowflake` | Shown on the platform card |
+| `description` | no | `Airflow tasks loading Snowflake tables` | Card subtitle |
+| `job_label` | no | `Airflow task` | What the UI calls a job (default `Job`) |
+| `table_label` | no | `Snowflake table` | What the UI calls a table (default `Table`) |
+| `table_types` | yes | `SNOWFLAKE` or `HIVE;HDFS` | `dataset_type` values that count as this platform's tables, `;`-separated. Other datasets are sources |
+| `color` | no | `#0369a1` | Hex color for load jobs and tables (default `#4338ca`) |
+
+Without `platforms.csv`, the Mainframe and Ab Initio platforms are used.
+
+**Any platform's folder** can use the generic file names `jobs.csv` / `job_datasets.csv`
+with the columns described in sections 1 and 2 (`job_name`, …). The step/port column in
+`job_datasets.csv` can be named `step`, `port` or `dd_name`, and the failure message column
+`error_message` or `return_code`. Ab Initio's `graphs.csv` / `graph_datasets.csv` (with
+`graph_name`) also still work.
 
 ## How the lineage is built
 
@@ -160,7 +188,7 @@ Set `last_run` and `next_run` either way:
 2. Start the API and open the UI (see `docs/JOB_LINEAGE.md` → *Try it locally*).
 3. Click **Sync job metadata** on the Job Lineage page, or run `curl -X POST localhost:8000/api/v1/job-lineage/sync`.
 
-The four jobs/datasets files are required. `table_columns.csv` and `column_lineage.csv` are optional; without them, column search and column lineage are empty. If the folder has no input files, the sync falls back to the built-in sample data.
+Each platform's jobs and datasets files are required. `table_columns.csv` and `column_lineage.csv` are optional; without them, column search and column lineage are empty. If the folder has no input files, the sync falls back to the built-in sample data.
 
 If a file has a mistake, the sync stops and shows the file, line and problem, for example:
 
@@ -181,14 +209,23 @@ used by `DATABASE_URL`.
 | Mainframe → Teradata | `TDLNSLD1` (CC 0008) | `TDLNSRPT` (`RISK_DB.COLLECTIONS_QUEUE`) | |
 | Ab Initio → Hadoop | `bld_cards_txn_enriched.mp` (out of memory) | `bld_fraud_features.mp` → `score_fraud_model.mp` → `exp_fraud_alerts.mp`, and `bld_spend_insights.mp` | `ing_web_clickstream.mp` |
 | Ab Initio → Hadoop | `bld_loan_funnel.mp` (input record format changed) | Nothing downstream (`analytics.loan_funnel_daily` is a final table) | |
+| Informatica → Oracle | `wf_fact_sales` (ORA-01652 temp segment) | `wf_agg_daily_sales` → `wf_exp_finance_feed` (`DW.FACT_SALES`, `MART.DAILY_SALES_AGG`, the finance feed file) | `wf_stg_returns` |
+| Airflow → Snowflake | `dbt_finance.fct_revenue` (numeric value 'N/A') | `bi_refresh.revenue_daily`, `reverse_etl.push_revenue_to_crm` (`ANALYTICS.MARTS.REVENUE_DAILY`, `salesforce://Opportunity`) | `dbt_core.fct_sessions` |
+| DataStage → DB2 | `dsj_load_provider_dim` (SQL0803N duplicate key) | `dsj_load_claim_fact` → `dsj_build_claims_mart` → `dsj_exp_regulatory` (`EDW.CLAIM_FACT`, `MART.CLAIMS_SUMMARY`, the regulatory report) | `dsj_ext_pharmacy` |
 
 SLA story: on Mainframe → Teradata, `CRDTXN01` and `TDLNSLD1` are **late** (failed); `TDCRDLD1` is **late** because
 it is blocked by `CRDTXN01`; `TDGLPST1` **completed 10 minutes late**; four jobs are **at risk**. On Ab Initio →
 Hadoop, `bld_cards_txn_enriched.mp` failing makes `bld_fraud_features.mp` late and the fraud scoring graphs at risk.
+On the three new platforms, each failed job is late and blocks a downstream job's SLA: `wf_agg_daily_sales`,
+`bi_refresh.revenue_daily` and `dsj_load_claim_fact`.
 
-Good columns to search: `CUSTOMER_ID` (8 Teradata/mainframe tables), `customer_id` (Hive), `amount`, `fraud_score`.
+Good columns to search: `CUSTOMER_ID` (8 Teradata/mainframe tables), `customer_id` (Hive), `amount`, `fraud_score`;
+`MEMBER_ID` (DataStage), `REVENUE_USD` / `ACCOUNT_ID` (Airflow), `ORDER_ID` / `CUSTOMER_NO` (Informatica).
 
 Good tables to search during the demo:
 
 - Mainframe → Teradata: `CARD_TRANSACTIONS`, `GL_POSTINGS`, `COLLECTIONS_QUEUE`
 - Ab Initio → Hadoop: `fraud_scores`, `txn_enriched`, `loan_funnel`
+- Informatica → Oracle: `FACT_SALES`, `DAILY_SALES_AGG`
+- Airflow → Snowflake: `FCT_REVENUE`, `APP_EVENTS`
+- DataStage → DB2: `CLAIM_FACT`, `PROVIDER_DIM`

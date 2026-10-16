@@ -417,7 +417,28 @@ export const syncMainframeJobs = async () => {
 
 // ============ Job Lineage (Mainframe/Teradata or Hadoop/Ab Initio) ============
 
-export type LineagePlatform = 'MAINFRAME' | 'HADOOP_ABINITIO';
+/** A configured platform id, e.g. 'MAINFRAME' (see getLineagePlatforms). */
+export type LineagePlatform = string;
+
+/** One platform from platforms.csv: a world of jobs and the tables they load. */
+export interface PlatformInfo {
+  id: LineagePlatform;
+  /** URL key and data folder, e.g. 'mainframe' */
+  key: string;
+  name: string;
+  description: string;
+  job_label: string;
+  table_label: string;
+  table_types: string[];
+  /** Hex color for the platform's load jobs and tables */
+  color: string;
+  summary: { jobs: number; failed: number; running: number; sla_late: number };
+}
+
+export const getLineagePlatforms = async () => {
+  const response = await apiClient.get<PlatformInfo[]>('/job-lineage/platforms');
+  return response.data;
+};
 export type LineageDirection = 'upstream' | 'downstream' | 'both';
 
 interface LineageNodeBase {
@@ -442,7 +463,8 @@ export interface LineageJobNode extends LineageNodeBase {
   catalog_id: number;
   platform: LineagePlatform;
   platform_label: string;
-  job_type: 'JCL' | 'TERADATA_LOAD' | 'AB_INITIO_GRAPH';
+  /** LOAD = writes one of the platform's tables; JOB = everything else */
+  job_type: 'JOB' | 'LOAD';
   owner?: string;
   description?: string;
   scheduler_system?: string;
@@ -459,7 +481,8 @@ export interface LineageJobNode extends LineageNodeBase {
 export interface LineageDatasetNode extends LineageNodeBase {
   type: 'dataset';
   dataset_type?: string;
-  platform: 'MAINFRAME' | 'TERADATA' | 'HADOOP';
+  /** One of the platform's tables (vs. a source file or input) */
+  is_table: boolean;
   database: string;
   /** Second label line for derived views (database / column graphs). */
   subtitle?: string;
@@ -573,7 +596,7 @@ export interface LineageColumn {
   dataset_id: string;
   dataset_name: string;
   dataset_type?: string;
-  platform?: 'MAINFRAME' | 'TERADATA' | 'HADOOP' | null;
+  is_table: boolean;
   database: string;
   data_type?: string;
   description?: string;

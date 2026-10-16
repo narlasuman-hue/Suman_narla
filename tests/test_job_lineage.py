@@ -105,8 +105,10 @@ def test_mainframe_graph_loads_teradata_tables(synced_db):
     assert (_job_id(synced_db, "TDGLLOAD"), td_table) in edges
 
     nodes = {n["id"]: n for n in graph["nodes"]}
-    assert nodes[_job_id(synced_db, "TDGLLOAD")]["job_type"] == "TERADATA_LOAD"
-    assert nodes[td_table]["platform"] == "TERADATA"
+    assert nodes[_job_id(synced_db, "TDGLLOAD")]["job_type"] == "LOAD"
+    assert nodes[_job_id(synced_db, "PAYRDLY1")]["job_type"] == "JOB"  # writes no Teradata table
+    assert nodes[td_table]["is_table"]
+    assert not nodes[dataset_node_id("PROD.PAYROLL.GL.EXTRACT")]["is_table"]
 
     summary = graph["summary"]
     assert summary["jobs"] == 5
@@ -133,10 +135,10 @@ def test_platforms_are_separate(synced_db):
         jobs = [n for n in service.get_graph(platform)["nodes"] if n["type"] == "job"]
         assert jobs and all(j["platform"] == platform for j in jobs)
 
-    ai_dataset_platforms = {
-        n["platform"] for n in service.get_graph(AI)["nodes"] if n["type"] == "dataset"
-    }
-    assert ai_dataset_platforms == {"HADOOP"}
+    # Every Ab Initio dataset in the sample is HDFS or Hive, i.e. a Hadoop table
+    assert all(
+        n["is_table"] for n in service.get_graph(AI)["nodes"] if n["type"] == "dataset"
+    )
 
 
 def test_unknown_platform_raises(synced_db):
@@ -248,8 +250,8 @@ def _use_sample_data(monkeypatch, tmp_path):
 async def test_sync_and_graph_routes(db):
     stats = await job_lineage_routes.sync_job_lineage(db)
     assert stats["source"] == "sample"
-    assert stats["mainframe"]["jobs_created"] == 5
-    assert stats["abinitio"]["jobs_created"] == 6
+    assert stats["platforms"]["MAINFRAME"]["jobs_created"] == 5
+    assert stats["platforms"]["HADOOP_ABINITIO"]["jobs_created"] == 6
 
     graph = await job_lineage_routes.get_job_lineage_graph(
         db=db, platform=MF, focus=None, direction="both", depth=None

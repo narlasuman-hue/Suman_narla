@@ -8,18 +8,12 @@ from fastapi import HTTPException
 
 from src.api.routes import job_lineage as routes
 from src.catalog.models import Job, JobSla
-from src.catalog.services.abinitio_sync import create_abinitio_sync_service
 from src.catalog.services.column_lineage import ColumnLineageService, column_node_id
 from src.catalog.services.job_lineage import JobLineageService, database_of
 from src.catalog.services.job_metadata import upsert_sla
-from src.catalog.services.mainframe_sync import create_mainframe_sync_service
+from src.catalog.services.lineage_sync import LineageSyncService
 from src.catalog.services.sla import evaluate_sla
-from src.connectors.lineage_files import (
-    CsvAbInitioConnector,
-    CsvMainframeConnector,
-    LineageFileError,
-    parse_deadline,
-)
+from src.connectors.lineage_files import CsvLineageConnector, LineageFileError, parse_deadline
 
 DEMO_DIR = Path(__file__).resolve().parent.parent / "demo_data" / "lineage"
 MF, AI = "MAINFRAME", "HADOOP_ABINITIO"
@@ -28,10 +22,9 @@ NOW = datetime(2026, 10, 8, 12, 0)
 
 @pytest.fixture
 def demo_db(db):
-    with CsvMainframeConnector(str(DEMO_DIR)) as mf:
-        assert create_mainframe_sync_service(db, mf).sync_all_jobs()["errors"] == []
-    with CsvAbInitioConnector(str(DEMO_DIR)) as ai:
-        assert create_abinitio_sync_service(db, ai).sync_all_graphs()["errors"] == []
+    for folder, platform in (("mainframe", MF), ("abinitio", AI)):
+        with CsvLineageConnector(str(DEMO_DIR), folder) as connector:
+            assert LineageSyncService(db, platform, connector).sync_all()["errors"] == []
     return db
 
 
@@ -120,16 +113,20 @@ def test_upsert_sla_clears_when_removed(db):
 
 
 @pytest.mark.parametrize(
-    "name, dataset_type, database",
+    "name, is_table, database",
     [
-        ("FINANCE_DB.GL_POSTINGS", "TERADATA", "FINANCE_DB"),
-        ("cards_raw.Auth_Events", "HIVE", "cards_raw"),
-        ("/data/raw/cards/auth", "HDFS", "/data/raw"),
-        ("PROD.PAYROLL.GL.EXTRACT", "PS", "PROD.PAYROLL"),
+        ("FINANCE_DB.GL_POSTINGS", True, "FINANCE_DB"),
+        ("cards_raw.Auth_Events", True, "cards_raw"),
+        ("ANALYTICS.CORE.FCT_SESSIONS", True, "ANALYTICS.CORE"),  # Snowflake db.schema.table
+        ("/data/raw/cards/auth", True, "/data/raw"),
+        ("PROD.PAYROLL.GL.EXTRACT", False, "PROD.PAYROLL"),
+        ("CRM.CUSTOMERS", False, "CRM"),
+        ("s3://acme-lake/events/app/", False, "s3://acme-lake"),
+        ("salesforce://Account", False, "salesforce"),
     ],
 )
-def test_database_of(name, dataset_type, database):
-    assert database_of(name, dataset_type) == database
+def test_database_of(name, is_table, database):
+    assert database_of(name, is_table) == database
 
 
 def test_dataset_nodes_carry_database(demo_db):
@@ -240,7 +237,7 @@ def _write(base: Path, mapping_row: str, columns: str = "") -> Path:
 
 def test_column_mapping_valid_case_insensitive(tmp_path):
     base = _write(tmp_path, "JOB1,prod.in.file,A,dw.out_table,B,\n")
-    with CsvMainframeConnector(str(base)) as connector:
+    with CsvLineageConnector(str(base), "mainframe") as connector:
         assert len(connector.get_job_column_lineage("JOB1")) == 1
         assert connector.get_job_details("JOB1")["expected_completion"].hour == 7
 
@@ -257,13 +254,13 @@ def test_column_mapping_valid_case_insensitive(tmp_path):
 def test_column_mapping_errors(tmp_path, row, message):
     base = _write(tmp_path, row)
     with pytest.raises(LineageFileError, match=message):
-        CsvMainframeConnector(str(base)).connect()
+        CsvLineageConnector(str(base), "mainframe").connect()
 
 
 def test_duplicate_table_column(tmp_path):
     base = _write(tmp_path, "", columns="DW.OUT_TABLE,B,INT\ndw.out_table,b,INT\n")
     with pytest.raises(LineageFileError, match="duplicate column"):
-        CsvMainframeConnector(str(base)).connect()
+        CsvLineageConnector(str(base), "mainframe").connect()
 
 
 # ---------- routes ----------

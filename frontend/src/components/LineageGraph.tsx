@@ -11,6 +11,8 @@ interface LineageGraphProps {
   highlightIds: Set<string> | null;
   /** If fitting everything would be unreadable, center on this node instead. */
   centerId?: string | null;
+  /** The platform's color, used for its load jobs and tables. */
+  color: string;
   onSelect: (id: string | null) => void;
 }
 
@@ -81,9 +83,14 @@ const layeredPositions = (nodes: LineageNode[], edges: LineageEdge[], columnGap:
 const statusIcon: Record<string, string> = { FAILED: '✖ ', RUNNING: '▶ ' };
 const SLA_LATE = new Set(['LATE', 'COMPLETED_LATE']);
 
-const toElements = (nodes: LineageNode[], edges: LineageEdge[]): ElementDefinition[] => {
+const toElements = (
+  nodes: LineageNode[],
+  edges: LineageEdge[],
+  color: string
+): ElementDefinition[] => {
   const labelled = edges.some((e) => e.label);
-  const positions = layeredPositions(nodes, edges, labelled ? LABELLED_COLUMN_GAP : COLUMN_GAP);
+  const columnGap = labelled ? LABELLED_COLUMN_GAP : COLUMN_GAP;
+  const positions = layeredPositions(nodes, edges, columnGap);
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const failed = (id: string) => {
     const n = byId.get(id);
@@ -106,7 +113,9 @@ const toElements = (nodes: LineageNode[], edges: LineageEdge[]): ElementDefiniti
         data: {
           id: n.id,
           label,
-          kind: n.type === 'job' ? n.job_type : `DS_${n.platform}`,
+          // JOB / LOAD for jobs; TABLE (the platform's tables) / SOURCE for datasets
+          kind: n.type === 'job' ? n.job_type : n.is_table ? 'TABLE' : 'SOURCE',
+          color,
           status: n.type === 'job' ? n.run_status : '',
         },
         classes: classes.filter(Boolean).join(' '),
@@ -116,7 +125,16 @@ const toElements = (nodes: LineageNode[], edges: LineageEdge[]): ElementDefiniti
     ...edges.map((e) => {
       const impacted =
         byId.get(e.target)?.impacted && (byId.get(e.source)?.impacted || failed(e.source));
-      const classes = [impacted ? 'impacted' : '', e.status === 'FAILED' ? 'failed' : ''];
+      // An arrow that skips a column would run straight through the boxes in between;
+      // bow it out instead.
+      const from = positions[e.source];
+      const to = positions[e.target];
+      const skips = from && to && Math.abs(to.x - from.x) > columnGap * 1.5 && Math.abs(to.y - from.y) < ROW_GAP;
+      const classes = [
+        impacted ? 'impacted' : '',
+        e.status === 'FAILED' ? 'failed' : '',
+        skips ? 'skip' : '',
+      ];
       return {
         group: 'edges' as const,
         data: { id: e.id, source: e.source, target: e.target, ...(e.label ? { label: e.label } : {}) },
@@ -142,14 +160,12 @@ const style: cytoscape.StylesheetJson = [
       'border-width': 2,
     },
   },
-  // Jobs: solid fill, coloured by platform
-  { selector: 'node[kind="JCL"]', style: { shape: 'round-rectangle', 'background-color': '#3730a3', 'border-color': '#312e81', color: '#fff' } },
-  { selector: 'node[kind="TERADATA_LOAD"]', style: { shape: 'round-rectangle', 'background-color': '#c2410c', 'border-color': '#9a3412', color: '#fff' } },
-  { selector: 'node[kind="AB_INITIO_GRAPH"]', style: { shape: 'round-rectangle', 'background-color': '#0f766e', 'border-color': '#115e59', color: '#fff' } },
-  // Datasets: light fill, coloured border, by where the data lives
-  { selector: 'node[kind="DS_MAINFRAME"]', style: { shape: 'barrel', 'background-color': '#eef2ff', 'border-color': '#6366f1', color: '#1e1b4b' } },
-  { selector: 'node[kind="DS_TERADATA"]', style: { shape: 'barrel', 'background-color': '#fff7ed', 'border-color': '#f97316', color: '#431407' } },
-  { selector: 'node[kind="DS_HADOOP"]', style: { shape: 'barrel', 'background-color': '#f0fdfa', 'border-color': '#14b8a6', color: '#042f2e' } },
+  // Jobs: solid fill. Jobs that load the platform's tables take the platform's color.
+  { selector: 'node[kind="JOB"]', style: { shape: 'round-rectangle', 'background-color': '#3730a3', 'border-color': '#312e81', color: '#fff' } },
+  { selector: 'node[kind="LOAD"]', style: { shape: 'round-rectangle', 'background-color': 'data(color)', 'border-color': 'data(color)', color: '#fff' } },
+  // Datasets: light fill and colored border. The platform's tables take its color.
+  { selector: 'node[kind="SOURCE"]', style: { shape: 'barrel', 'background-color': '#f1f5f9', 'border-color': '#64748b', color: '#0f172a' } },
+  { selector: 'node[kind="TABLE"]', style: { shape: 'barrel', 'background-color': 'data(color)', 'background-opacity': 0.1, 'border-color': 'data(color)', color: '#111827' } },
   // Run status
   { selector: 'node[status="FAILED"]', style: { 'border-color': '#dc2626', 'border-width': 5 } },
   { selector: 'node[status="RUNNING"]', style: { 'border-color': '#60a5fa', 'border-width': 4, 'border-style': 'dashed' } },
@@ -179,6 +195,10 @@ const style: cytoscape.StylesheetJson = [
       'text-wrap': 'ellipsis',
     },
   },
+  {
+    selector: 'edge.skip',
+    style: { 'curve-style': 'unbundled-bezier', 'control-point-distances': [-55], 'control-point-weights': [0.5] },
+  },
   { selector: 'edge.impacted', style: { width: 3, 'line-color': '#f59e0b', 'target-arrow-color': '#f59e0b' } },
   { selector: 'edge.failed', style: { width: 3, 'line-color': '#dc2626', 'target-arrow-color': '#dc2626', color: '#b91c1c' } },
   { selector: 'node.database', style: { shape: 'round-rectangle', 'border-width': 3, 'font-weight': 'bold' } },
@@ -192,6 +212,7 @@ const LineageGraph: React.FC<LineageGraphProps> = ({
   selectedId,
   highlightIds,
   centerId,
+  color,
   onSelect,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -203,7 +224,7 @@ const LineageGraph: React.FC<LineageGraphProps> = ({
     if (!containerRef.current) return;
     const cy = cytoscape({
       container: containerRef.current,
-      elements: toElements(nodes, edges),
+      elements: toElements(nodes, edges, color),
       style,
       layout: { name: 'preset', fit: true, padding: 30 },
       minZoom: 0.15,
@@ -248,7 +269,7 @@ const LineageGraph: React.FC<LineageGraphProps> = ({
     };
     // Re-run only when the graph itself changes, not when the center hint does.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, edges]);
+  }, [nodes, edges, color]);
 
   useEffect(() => {
     const cy = cyRef.current;
