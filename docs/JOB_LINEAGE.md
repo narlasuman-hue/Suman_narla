@@ -1,5 +1,7 @@
 # Job Lineage: one UI for any job platform
 
+> New here? Start with [`SRE_JOB_LINEAGE_GUIDE.md`](SRE_JOB_LINEAGE_GUIDE.md): what it does, how to run it on Windows or Mac, the demo script and troubleshooting.
+
 The **Job Lineage** page (`/job-lineage` in the UI) covers **independent platforms**: one
 world of jobs and the tables they load. The user picks one at the top of the page and sees
 only that platform's lineage. Platforms are **configured, not coded** (see
