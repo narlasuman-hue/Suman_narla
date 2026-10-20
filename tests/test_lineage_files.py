@@ -101,6 +101,39 @@ def test_running_status_from_files(db, tmp_path):
     assert db.query(Job).filter(Job.name == "JOB1").one().executions[0].status == "RUNNING"
 
 
+def test_status_kept_without_last_run(db, tmp_path):
+    """FAILED/RUNNING with a blank last_run keep their status; blank SUCCESS stays UNKNOWN."""
+    base = write_files(
+        tmp_path,
+        mf_jobs=(
+            "JOB1,,CA-7,S1,,,FAILED,ABEND S0C7,,\n"
+            "JOB2,,CA-7,S1,,,RUNNING,,,\n"
+            "JOB3,,CA-7,S1,,,,,,\n"
+        ),
+        mf_ds="JOB1,OUT,A.B,OUTPUT,TERADATA\nJOB2,IN,A.B,INPUT,TERADATA\n",
+    )
+    sync(db, base)
+    sync(db, base)  # re-sync updates the undated run in place
+
+    job1 = db.query(Job).filter(Job.name == "JOB1").one()
+    assert len(job1.executions) == 1
+    assert job1.executions[0].start_time is None
+    nodes = {n["name"]: n for n in JobLineageService(db).get_graph("MAINFRAME")["nodes"]}
+    assert nodes["JOB1"]["run_status"] == "FAILED"
+    assert nodes["JOB1"]["run_error"] == "ABEND S0C7"
+    assert nodes["JOB2"]["run_status"] == "RUNNING"
+    assert nodes["JOB2"]["impacted"]
+    assert nodes["JOB3"]["run_status"] == "UNKNOWN"
+
+    # A dated run later replaces the undated one
+    (tmp_path / "mainframe/jobs.csv").write_text(
+        MF_JOBS + "JOB1,,CA-7,S1,,-1h,SUCCESS,,,\nJOB2,,CA-7,S1,,,RUNNING,,,\n"
+    )
+    sync(db, base)
+    db.refresh(job1)
+    assert [(e.status, e.start_time is None) for e in job1.executions] == [("SUCCESS", False)]
+
+
 @pytest.mark.parametrize(
     "files, message",
     [

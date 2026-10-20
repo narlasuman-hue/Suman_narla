@@ -16,7 +16,7 @@ Load it in the UI with `LINEAGE_DATA_DIR=test_data/lineage/valid`, then **Sync j
 | Ab Initio → Hadoop | `graphs.csv` naming; HDFS paths match exactly (`/DATA/RAW/EVENTS` is **not** `/data/raw/events`); Hive names case-insensitive; SLA `MET` and `COMPLETED_LATE`; `MONTHLY` |
 | Informatica → Oracle | Only the two required files; `INOUT` upsert; ` failed ` with spaces; never-run job with blank scheduler; job that only reads |
 | Airflow → Snowflake | `s3://` and `salesforce://` names match exactly; Unicode description; `WEEKLY`; job writing only to an API (not a load job) |
-| DataStage → DB2 | Column lineage within one `INOUT` table; `00:00` clock SLA; `MONTHLY` success 20 days ago still meets the SLA; blank `duration_seconds` |
+| DataStage → DB2 | Column lineage within one `INOUT` table; `00:00` clock SLA; `MONTHLY` success 20 days ago still meets the SLA; blank `duration_seconds`; `RUNNING` with a blank `last_run` keeps its status |
 | SSIS → SQL Server | 6th platform from files only: lower-case `platform_id`, mixed-case folder, blank labels and color (defaults), two `table_types` with spaces and a trailing `;` |
 
 ## `invalid/`: one broken rule per folder

@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from src.catalog.models import Job
 from src.catalog.platforms import Platform, get_platform
-from src.catalog.services.job_runs import RUN_FAILED, RUN_RUNNING
+from src.catalog.services.job_runs import RUN_FAILED, RUN_RUNNING, latest_run
 from src.catalog.services.sla import COMPLETED_LATE, LATE, MET, SEVERITY, evaluate_sla
 
 DIRECTIONS = ("upstream", "downstream", "both")
@@ -111,7 +111,7 @@ class JobLineageService:
 
         for job in jobs:
             jid = job_node_id(job.id)
-            latest = max(job.executions, key=lambda e: e.start_time, default=None)
+            latest = latest_run(job)
             nodes[jid] = {
                 "id": jid,
                 "type": "job",

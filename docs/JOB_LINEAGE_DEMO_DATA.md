@@ -80,7 +80,7 @@ If a job fails, everything downstream of it through these links is marked as
 | `description` | no | `FastLoad payroll GL extract…` | |
 | `job_class` | no | `T` | JES job class |
 | `frequency` | no | `DAILY` | |
-| `last_run` | no | `-9h` | When the last run started (see **Times** below) |
+| `last_run` | no | `-9h` | When the last run started (see **Times** below). If blank, a `FAILED` or `RUNNING` status still shows; a `SUCCESS` shows as not run |
 | `next_run` | no | `+15h` | Next scheduled run |
 | `return_code` | no | `ABEND S0C7` / `CC 0008` | Shown as the error when the job failed |
 | `duration_seconds` | no | `420` | Whole number; used to work out when the run completed for SLA |

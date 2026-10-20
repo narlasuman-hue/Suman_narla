@@ -1,4 +1,4 @@
 job_name,owner,description,scheduler_system,schedule_name,frequency,last_run,last_run_status,duration_seconds,error_message,expected_completion,next_run
 dsj_ext_claims,CLAIMS_ETL_TEAM,Clock-time SLA at midnight,TWS,CLAIMS-NIGHTLY,DAILY,-3h,SUCCESS,,,00:00,+21h
-dsj_merge_claims,CLAIMS_ETL_TEAM,Merges into EDW.CLAIMS (INOUT); still running,TWS,CLAIMS-NIGHTLY,DAILY,-10m,RUNNING,,,+1h,+1d
+dsj_merge_claims,CLAIMS_ETL_TEAM,Merges into EDW.CLAIMS (INOUT); RUNNING with no last_run keeps its status,TWS,CLAIMS-NIGHTLY,DAILY,,RUNNING,,,+1h,+1d
 dsj_load_mart,EDW_TEAM,Monthly mart: a 20-day-old success still counts,TWS,CLAIMS-MONTHLY,MONTHLY,-20d,SUCCESS,3600,,-1d,+10d

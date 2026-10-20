@@ -29,11 +29,17 @@ def record_last_run(
     """Upsert the run of ``job`` that started at ``start_time``.
 
     Re-syncing the same run updates it in place (e.g. RUNNING -> SUCCESS)
-    instead of adding a duplicate row. Returns ``None`` when the source
-    reported no run.
+    instead of adding a duplicate row. A FAILED or RUNNING run without a start
+    time is kept as the job's single undated run, which any later report
+    replaces. Returns ``None`` when the source reported no run.
     """
-    if start_time is None:
-        return None
+    undated = start_time is None and status in (RUN_FAILED, RUN_RUNNING)
+    if not undated:
+        db.query(JobExecution).filter(
+            JobExecution.job_id == job.id, JobExecution.start_time.is_(None)
+        ).delete(synchronize_session="fetch")
+        if start_time is None:
+            return None
 
     execution = (
         db.query(JobExecution)
@@ -48,3 +54,9 @@ def record_last_run(
     execution.duration_seconds = duration_seconds
     execution.error_message = error_message
     return execution
+
+
+def latest_run(job: Job) -> Optional[JobExecution]:
+    """The job's current run: its undated run if it has one, else the latest by start time."""
+    undated = next((e for e in job.executions if e.start_time is None), None)
+    return undated or max(job.executions, key=lambda e: e.start_time, default=None)
