@@ -76,7 +76,7 @@ const ReportsPage: React.FC = () => {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Reports & Analytics</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Reports & Analytics</h1>
         <p className="mt-1 text-gray-600">
           View comprehensive statistics and insights about your database catalog
         </p>

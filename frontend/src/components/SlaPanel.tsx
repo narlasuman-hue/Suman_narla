@@ -140,7 +140,7 @@ const SlaPanel: React.FC<SlaPanelProps> = ({ platform, refreshKey, onShowLineage
                       <button
                         onClick={() => onShowImpact(j.id)}
                         title="Blast radius"
-                        className="p-2 rounded bg-amber-500 text-white hover:bg-amber-600"
+                        className="p-2 rounded bg-blue-700 text-white hover:bg-blue-800"
                       >
                         <FiZap size={14} />
                       </button>

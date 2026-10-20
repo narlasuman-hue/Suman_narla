@@ -86,8 +86,8 @@ const AssetDetail: React.FC<AssetDetailProps> = ({ assetType }) => {
           <FiDatabase className="text-blue-600" size={32} />
         )}
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">{asset.name}</h1>
-          <p className="text-gray-600">{asset.database || 'Database Metadata Catalog'}</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">{asset.name}</h1>
+          <p className="text-gray-600">{asset.database || 'Catalog asset'}</p>
         </div>
       </div>
 

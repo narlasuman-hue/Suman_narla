@@ -21,9 +21,9 @@ export const formatLate = (minutes: number) =>
   minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : `${minutes}m`;
 
 const RUN_STYLE: Record<string, string> = {
-  SUCCESS: 'bg-green-100 text-green-800',
-  FAILED: 'bg-red-100 text-red-800',
-  RUNNING: 'bg-blue-100 text-blue-800',
+  SUCCESS: 'bg-green-50 text-green-800',
+  FAILED: 'bg-red-700 text-white',
+  RUNNING: 'bg-blue-700 text-white',
 };
 
 export const RunStatusBadge: React.FC<{ status: string }> = ({ status }) => (
@@ -41,11 +41,11 @@ export const SLA_LABEL: Record<SlaStatus, string> = {
 };
 
 export const SLA_STYLE: Record<SlaStatus, string> = {
-  LATE: 'bg-red-600 text-white',
-  COMPLETED_LATE: 'bg-red-100 text-red-800',
-  AT_RISK: 'bg-amber-100 text-amber-900',
-  ON_TRACK: 'bg-blue-100 text-blue-800',
-  MET: 'bg-green-100 text-green-800',
+  LATE: 'bg-red-700 text-white',
+  COMPLETED_LATE: 'bg-amber-100 text-amber-900',
+  AT_RISK: 'bg-orange-100 text-orange-900',
+  ON_TRACK: 'bg-blue-50 text-blue-800',
+  MET: 'bg-green-50 text-green-800',
 };
 
 export const SlaBadge: React.FC<{ status?: SlaStatus | null; prefix?: string }> = ({ status, prefix }) =>
@@ -55,3 +55,20 @@ export const SlaBadge: React.FC<{ status?: SlaStatus | null; prefix?: string }> 
       {SLA_LABEL[status]}
     </span>
   ) : null;
+
+/** Compact upper-case status label, matching the status line on graph nodes. */
+export type StatusKind = 'FAILED' | 'RUNNING' | 'BLOCKED' | 'LATE' | 'DONE_LATE';
+
+const CHIP_STYLE: Record<StatusKind, string> = {
+  FAILED: 'bg-red-700 text-white',
+  RUNNING: 'bg-blue-700 text-white',
+  BLOCKED: 'bg-orange-100 text-orange-900',
+  LATE: 'bg-red-100 text-red-900',
+  DONE_LATE: 'bg-amber-100 text-amber-900',
+};
+
+export const StatusChip: React.FC<{ kind: StatusKind }> = ({ kind }) => (
+  <span className={`inline-flex h-[18px] items-center rounded px-1.5 text-[10px] font-bold tracking-wide whitespace-nowrap ${CHIP_STYLE[kind]}`}>
+    {kind.replace('_', ' ')}
+  </span>
+);

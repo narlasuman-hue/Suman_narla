@@ -160,7 +160,7 @@ const LineageDetailsPanel: React.FC<Props> = ({
         </button>
         <button
           onClick={() => onShowImpact(node.id)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-amber-500 text-white hover:bg-amber-600"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-blue-700 text-white hover:bg-blue-800"
         >
           <FiZap size={14} /> Blast radius
         </button>

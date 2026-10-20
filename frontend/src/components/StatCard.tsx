@@ -9,12 +9,12 @@ interface StatCardProps {
 }
 
 const colorMap = {
-  blue: 'bg-blue-50 text-blue-600',
-  green: 'bg-green-50 text-green-600',
-  purple: 'bg-purple-50 text-purple-600',
-  indigo: 'bg-indigo-50 text-indigo-600',
-  red: 'bg-red-50 text-red-600',
-  orange: 'bg-orange-50 text-orange-600',
+  blue: 'bg-blue-50 text-blue-700',
+  green: 'bg-green-50 text-green-700',
+  purple: 'bg-purple-50 text-purple-700',
+  indigo: 'bg-blue-50 text-blue-700',
+  red: 'bg-red-50 text-red-700',
+  orange: 'bg-orange-50 text-orange-700',
 };
 
 export const StatCard: React.FC<StatCardProps> = ({
@@ -24,15 +24,13 @@ export const StatCard: React.FC<StatCardProps> = ({
   color = 'blue',
 }) => {
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-gray-600 text-sm font-medium">{title}</p>
-          <p className="text-3xl font-bold text-gray-900 mt-2">{value.toLocaleString()}</p>
-        </div>
-        <div className={clsx('p-3 rounded-lg', colorMap[color])}>
-          <Icon size={24} />
-        </div>
+    <div className="flex items-start justify-between gap-3 rounded-lg bg-white p-4 shadow">
+      <div className="min-w-0">
+        <p className="text-xs font-medium text-gray-600">{title}</p>
+        <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900">{value.toLocaleString()}</p>
+      </div>
+      <div className={clsx('rounded-lg p-2', colorMap[color])}>
+        <Icon size={18} />
       </div>
     </div>
   );

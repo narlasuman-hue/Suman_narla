@@ -67,9 +67,9 @@ const Dashboard: React.FC = () => {
     <div className="space-y-6">
       {/* Page Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Dashboard</h1>
         <p className="mt-1 text-gray-600">
-          Welcome to the Database Metadata Catalog
+          Overview of the catalog's databases, tables and jobs
         </p>
       </div>
 

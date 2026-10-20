@@ -1,17 +1,8 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import {
-  FiHome,
-  FiSearch,
-  FiShare2,
-  FiBarChart2,
-  FiTrendingUp,
-  FiEye,
-  FiGitBranch,
-  FiServer,
-  FiLayers,
-} from 'react-icons/fi';
+import { FiLayers, FiX } from 'react-icons/fi';
 import clsx from 'clsx';
+import { NAV_SECTIONS } from './navigation';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -19,107 +10,99 @@ interface SidebarProps {
   onMobileClose: () => void;
 }
 
-const menuItems = [
-  { icon: FiHome, label: 'Dashboard', href: '/' },
-  { icon: FiSearch, label: 'Search', href: '/search' },
-  { icon: FiGitBranch, label: 'Lineage', href: '/lineage/1' },
-  { icon: FiShare2, label: 'Impact Analysis', href: '/analysis' },
-  { icon: FiBarChart2, label: 'Reports', href: '/reports' },
-  { icon: FiTrendingUp, label: 'Lifecycle', href: '/lifecycle' },
-  { icon: FiEye, label: 'Query Analysis', href: '/analysis' },
-  { icon: FiServer, label: 'Mainframe Jobs', href: '/mainframe' },
-  { icon: FiLayers, label: 'Job Lineage', href: '/job-lineage' },
-];
+const Brand: React.FC<{ compact?: boolean }> = ({ compact }) => (
+  <Link to="/" className="flex items-center gap-2.5 px-2 py-1 text-white hover:text-white">
+    <FiLayers size={24} className="flex-shrink-0 text-blue-400" />
+    {!compact && (
+      <span>
+        <span className="block text-[15px] font-bold leading-tight">Lineage Catalog</span>
+        <span className="block text-[11px] text-gray-400">Jobs · tables · SLAs</span>
+      </span>
+    )}
+  </Link>
+);
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, isMobileOpen, onMobileClose }) => {
+const NavLinks: React.FC<{ compact?: boolean; onNavigate?: () => void }> = ({ compact, onNavigate }) => {
   const location = useLocation();
-
-  const isActive = (href: string) => location.pathname === href;
+  const params = new URLSearchParams(location.search);
 
   return (
-    <>
-      {/* Desktop Sidebar */}
-      <div
-        className={clsx(
-          'hidden lg:flex flex-col bg-white border-r border-gray-200 transition-all duration-300 overflow-hidden',
-          isOpen ? 'w-64' : 'w-20'
-        )}
-      >
-        <nav className="flex-1 px-2 py-4 space-y-2">
-          {menuItems.map((item) => {
+    <nav aria-label="Main" className="flex-1 space-y-5 overflow-y-auto px-3 py-2">
+      {NAV_SECTIONS.map((section) => (
+        <div key={section.title} className="space-y-0.5">
+          {compact ? (
+            <div className="mx-3 mb-2 border-t border-gray-800" aria-hidden="true" />
+          ) : (
+            <div className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+              {section.title}
+            </div>
+          )}
+          {section.items.map((item) => {
             const Icon = item.icon;
-            const active = isActive(item.href);
-
+            const active = item.isActive(location.pathname, params);
             return (
               <Link
                 key={item.href}
                 to={item.href}
+                onClick={onNavigate}
+                title={compact ? item.label : undefined}
+                aria-current={active ? 'page' : undefined}
                 className={clsx(
-                  'flex items-center gap-3 px-3 py-2 rounded-lg transition-colors',
+                  'flex h-9 items-center gap-3 rounded-lg px-3 text-[13px]',
+                  compact && 'justify-center',
                   active
-                    ? 'bg-blue-50 text-blue-600 font-medium'
-                    : 'text-gray-600 hover:bg-gray-50'
+                    ? 'bg-gray-800 font-semibold text-white hover:text-white'
+                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
                 )}
               >
-                <Icon size={20} className="flex-shrink-0" />
-                {isOpen && <span className="text-sm">{item.label}</span>}
+                <Icon size={16} className="flex-shrink-0" />
+                {!compact && <span>{item.label}</span>}
               </Link>
             );
           })}
-        </nav>
-
-        <div className="border-t border-gray-200 p-4">
-          <div className={clsx('text-xs text-gray-500', !isOpen && 'text-center')}>
-            {isOpen ? 'Database Metadata Catalog v1.0' : 'v1.0'}
-          </div>
         </div>
-      </div>
-
-      {/* Mobile Sidebar */}
-      <div
-        className={clsx(
-          'fixed inset-0 z-50 transform transition-transform duration-300 lg:hidden',
-          isMobileOpen ? 'translate-x-0' : '-translate-x-full'
-        )}
-      >
-        <div className="flex h-full w-64 flex-col bg-white shadow-lg">
-          <div className="flex items-center justify-between p-4 border-b">
-            <span className="font-bold text-lg">Menu</span>
-            <button
-              onClick={onMobileClose}
-              className="p-1 text-gray-600 hover:bg-gray-100 rounded"
-            >
-              ×
-            </button>
-          </div>
-
-          <nav className="flex-1 px-2 py-4 space-y-2">
-            {menuItems.map((item) => {
-              const Icon = item.icon;
-              const active = isActive(item.href);
-
-              return (
-                <Link
-                  key={item.href}
-                  to={item.href}
-                  onClick={onMobileClose}
-                  className={clsx(
-                    'flex items-center gap-3 px-3 py-2 rounded-lg transition-colors',
-                    active
-                      ? 'bg-blue-50 text-blue-600 font-medium'
-                      : 'text-gray-600 hover:bg-gray-50'
-                  )}
-                >
-                  <Icon size={20} />
-                  <span className="text-sm">{item.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-      </div>
-    </>
+      ))}
+    </nav>
   );
 };
+
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, isMobileOpen, onMobileClose }) => (
+  <>
+    {/* Desktop */}
+    <aside
+      className={clsx(
+        'hidden flex-col gap-4 overflow-hidden bg-gray-900 py-4 transition-all duration-300 lg:flex',
+        isOpen ? 'w-60' : 'w-[72px]'
+      )}
+    >
+      <div className={clsx('px-3', !isOpen && 'flex justify-center')}>
+        <Brand compact={!isOpen} />
+      </div>
+      <NavLinks compact={!isOpen} />
+    </aside>
+
+    {/* Mobile */}
+    <div
+      className={clsx(
+        'fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 lg:hidden',
+        isMobileOpen ? 'translate-x-0' : '-translate-x-full'
+      )}
+    >
+      <aside className="flex h-full w-64 flex-col gap-4 bg-gray-900 py-4 shadow-lg">
+        <div className="flex items-center justify-between px-3">
+          <Brand />
+          <button
+            onClick={onMobileClose}
+            aria-label="Close menu"
+            className="rounded-lg p-2 text-gray-300 hover:bg-gray-800 hover:text-white"
+          >
+            <FiX size={18} />
+          </button>
+        </div>
+        <NavLinks onNavigate={onMobileClose} />
+      </aside>
+    </div>
+  </>
+);
 
 export default Sidebar;

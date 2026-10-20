@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { FiMenu, FiX } from 'react-icons/fi';
 import Header from './Header';
 import Sidebar from './Sidebar';
 
@@ -11,36 +9,30 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const location = useLocation();
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* Sidebar */}
+    <div className="flex h-screen bg-canvas">
       <Sidebar
         isOpen={sidebarOpen}
         isMobileOpen={mobileMenuOpen}
         onMobileClose={() => setMobileMenuOpen(false)}
       />
 
-      {/* Main content */}
-      <div className="flex-1 overflow-hidden flex flex-col">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Header
           onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
           onMobileMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
         />
-
         <main className="flex-1 overflow-auto">
-          <div className="p-6 max-w-7xl mx-auto">
-            {children}
-          </div>
+          <div className="mx-auto max-w-[1600px] p-4 sm:p-6">{children}</div>
         </main>
       </div>
 
-      {/* Mobile overlay */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 md:hidden z-40"
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
           onClick={() => setMobileMenuOpen(false)}
+          aria-hidden="true"
         />
       )}
     </div>

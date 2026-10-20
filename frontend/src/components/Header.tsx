@@ -1,6 +1,7 @@
-import React from 'react';
-import { FiMenu, FiX, FiSearch } from 'react-icons/fi';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { FiMenu, FiSearch } from 'react-icons/fi';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { breadcrumb } from './navigation';
 
 interface HeaderProps {
   onMenuToggle: () => void;
@@ -8,47 +9,57 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ onMenuToggle, onMobileMenuToggle }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [query, setQuery] = useState('');
+  const crumbs = breadcrumb(location.pathname, new URLSearchParams(location.search));
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = query.trim();
+    navigate(q ? `/search?q=${encodeURIComponent(q)}` : '/search');
+  };
+
   return (
-    <header className="bg-white border-b border-gray-200 shadow-sm">
-      <div className="px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onMenuToggle}
-            className="hidden lg:block p-2 text-gray-600 hover:bg-gray-100 rounded"
-          >
-            <FiMenu size={20} />
-          </button>
+    <header className="flex min-h-[64px] flex-wrap items-center gap-4 border-b border-gray-200 bg-white px-4 py-3 sm:px-6">
+      <button
+        onClick={onMenuToggle}
+        aria-label="Collapse sidebar"
+        className="hidden rounded-lg p-2 text-gray-600 hover:bg-gray-100 lg:block"
+      >
+        <FiMenu size={18} />
+      </button>
+      <button
+        onClick={onMobileMenuToggle}
+        aria-label="Open menu"
+        className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 lg:hidden"
+      >
+        <FiMenu size={18} />
+      </button>
 
-          <button
-            onClick={onMobileMenuToggle}
-            className="lg:hidden p-2 text-gray-600 hover:bg-gray-100 rounded"
-          >
-            <FiMenu size={20} />
-          </button>
+      <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm">
+        {crumbs.map((c, i) => (
+          <React.Fragment key={c}>
+            {i > 0 && <span className="text-gray-400" aria-hidden="true">/</span>}
+            <span className={i === crumbs.length - 1 ? 'font-semibold text-gray-900' : 'text-gray-600'}>{c}</span>
+          </React.Fragment>
+        ))}
+      </nav>
 
-          <Link to="/" className="text-xl font-bold text-blue-600">
-            Database Catalog
-          </Link>
-        </div>
-
-        <div className="flex-1 max-w-md mx-4">
-          <Link to="/search" className="w-full">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search assets..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                onClick={(e) => e.currentTarget.focus()}
-              />
-              <FiSearch className="absolute right-3 top-2.5 text-gray-400" size={18} />
-            </div>
-          </Link>
-        </div>
-
-        <div className="text-sm text-gray-600">
-          Connected to Teradata
-        </div>
-      </div>
+      <form onSubmit={submit} role="search" className="relative ml-auto w-full max-w-sm sm:w-auto sm:flex-1">
+        <label htmlFor="global-search" className="sr-only">
+          Search tables, columns and views
+        </label>
+        <FiSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+        <input
+          id="global-search"
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search tables, columns, views"
+          className="h-9 w-full rounded-lg border border-gray-300 bg-gray-50 pl-9 pr-3 text-sm focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
+        />
+      </form>
     </header>
   );
 };

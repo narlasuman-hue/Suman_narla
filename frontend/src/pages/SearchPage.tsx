@@ -3,11 +3,14 @@ import { FiSearch, FiTable, FiColumns, FiDatabase } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { globalSearch, autocomplete } from '../services/api';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import clsx from 'clsx';
 
 const SearchPage: React.FC = () => {
-  const [query, setQuery] = useState('');
+  // ?q= comes from the search box in the header
+  const [searchParams] = useSearchParams();
+  const urlQuery = searchParams.get('q') || '';
+  const [query, setQuery] = useState(urlQuery);
   const [results, setResults] = useState<any>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -57,6 +60,12 @@ const SearchPage: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (urlQuery) handleSearch(urlQuery);
+    // Run once per header search; handleSearch is recreated every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlQuery]);
+
   const toggleAssetType = (type: string) => {
     setAssetTypeFilter((prev) =>
       prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
@@ -67,7 +76,7 @@ const SearchPage: React.FC = () => {
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Search Assets</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Search Assets</h1>
         <p className="mt-1 text-gray-600">
           Search across tables, columns, views, and more
         </p>

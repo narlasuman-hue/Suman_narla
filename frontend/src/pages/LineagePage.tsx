@@ -54,7 +54,7 @@ const LineagePage: React.FC = () => {
       <div className="flex items-center gap-3 mb-4">
         <FiGitBranch className="text-purple-600" size={32} />
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Data Lineage</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Data Lineage</h1>
           <p className="text-gray-600">Table ID: {id}</p>
         </div>
       </div>

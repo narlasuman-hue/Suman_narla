@@ -65,7 +65,7 @@ const QueryAnalysisPage: React.FC = () => {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Query Analysis</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Query Analysis</h1>
         <p className="mt-1 text-gray-600">
           Analyze query patterns, usage trends, and identify heavy users
         </p>

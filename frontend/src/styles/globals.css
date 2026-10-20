@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+body {
+  @apply bg-canvas text-gray-900 antialiased;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

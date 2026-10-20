@@ -66,7 +66,7 @@ const MainframeJobsPage: React.FC = () => {
         <div className="flex items-center gap-3">
           <FiServer className="text-indigo-600" size={32} />
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Mainframe Jobs</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Mainframe Jobs</h1>
             <p className="text-gray-600">Job details, files used, and schedule names</p>
           </div>
         </div>
