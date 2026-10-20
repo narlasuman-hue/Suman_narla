@@ -1,4 +1,4 @@
-/** The app's navigation: sidebar sections and the header breadcrumb come from here. */
+/** The app's navigation: the sidebar items and the header breadcrumb come from here. */
 import { FiClock, FiLayers, FiServer } from 'react-icons/fi';
 import { IconType } from 'react-icons';
 
@@ -10,39 +10,27 @@ export interface NavItem {
   isActive: (path: string, params: URLSearchParams) => boolean;
 }
 
-export interface NavSection {
-  title: string;
-  items: NavItem[];
-}
-
 const prefix = (start: string) => (path: string) => path.startsWith(start);
 
-export const NAV_SECTIONS: NavSection[] = [
+export const NAV_ITEMS: NavItem[] = [
   {
-    title: 'Monitor',
-    items: [
-      {
-        label: 'Lineage Tracking',
-        href: '/job-lineage',
-        icon: FiLayers,
-        isActive: (path, params) => path === '/job-lineage' && params.get('tab') !== 'sla',
-      },
-      {
-        label: 'SLA Tracking',
-        href: '/job-lineage?tab=sla',
-        icon: FiClock,
-        isActive: (path, params) => path === '/job-lineage' && params.get('tab') === 'sla',
-      },
-      { label: 'Jobs Tracking', href: '/jobs', icon: FiServer, isActive: prefix('/jobs') },
-    ],
+    label: 'Lineage Tracking',
+    href: '/job-lineage',
+    icon: FiLayers,
+    isActive: (path, params) => path === '/job-lineage' && params.get('tab') !== 'sla',
   },
+  {
+    label: 'SLA Tracking',
+    href: '/job-lineage?tab=sla',
+    icon: FiClock,
+    isActive: (path, params) => path === '/job-lineage' && params.get('tab') === 'sla',
+  },
+  { label: 'Jobs Tracking', href: '/jobs', icon: FiServer, isActive: prefix('/jobs') },
 ];
 
 /** Breadcrumb for the current page, e.g. ["Lineage Tracking"] or ["Jobs Tracking", "Job"]. */
 export const breadcrumb = (path: string, params: URLSearchParams): string[] => {
-  for (const section of NAV_SECTIONS) {
-    const item = section.items.find((i) => i.isActive(path, params));
-    if (item) return path.startsWith('/jobs/') ? [item.label, 'Job'] : [item.label];
-  }
-  return [];
+  const item = NAV_ITEMS.find((i) => i.isActive(path, params));
+  if (!item) return [];
+  return path.startsWith('/jobs/') ? [item.label, 'Job'] : [item.label];
 };

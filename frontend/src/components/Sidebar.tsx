@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { FiChevronsLeft, FiChevronsRight, FiX } from 'react-icons/fi';
 import clsx from 'clsx';
-import { NAV_SECTIONS } from './navigation';
+import { NAV_ITEMS } from './navigation';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -13,7 +13,6 @@ interface SidebarProps {
 
 /** Label that pops out beside a collapsed sidebar icon. */
 interface Flyout {
-  section: string;
   label: string;
   top: number;
 }
@@ -24,56 +23,45 @@ const NavLinks: React.FC<{ compact?: boolean; onNavigate?: () => void }> = ({ co
   const [flyout, setFlyout] = useState<Flyout | null>(null);
 
   // Collapsed: show the item's name beside its icon on hover and keyboard focus.
-  const showFlyout = (section: string, label: string) => (e: React.SyntheticEvent<HTMLElement>) => {
+  const showFlyout = (label: string) => (e: React.SyntheticEvent<HTMLElement>) => {
     if (!compact) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    setFlyout({ section, label, top: rect.top + rect.height / 2 });
+    setFlyout({ label, top: rect.top + rect.height / 2 });
   };
   const hideFlyout = () => setFlyout(null);
 
   return (
-    <nav aria-label="Main" className="flex-1 space-y-5 overflow-y-auto px-3 py-2">
-      {NAV_SECTIONS.map((section) => (
-        <div key={section.title} className="space-y-0.5">
-          {compact ? (
-            <div className="mx-3 mb-2 border-t border-gray-800" aria-hidden="true" />
-          ) : (
-            <div className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-              {section.title}
-            </div>
-          )}
-          {section.items.map((item) => {
-            const Icon = item.icon;
-            const active = item.isActive(location.pathname, params);
-            return (
-              <Link
-                key={item.href}
-                to={item.href}
-                onClick={() => {
-                  hideFlyout();
-                  onNavigate?.();
-                }}
-                onMouseEnter={showFlyout(section.title, item.label)}
-                onMouseLeave={hideFlyout}
-                onFocus={showFlyout(section.title, item.label)}
-                onBlur={hideFlyout}
-                aria-label={compact ? item.label : undefined}
-                aria-current={active ? 'page' : undefined}
-                className={clsx(
-                  'flex h-9 items-center gap-3 rounded-lg px-3 text-[13px]',
-                  compact && 'justify-center',
-                  active
-                    ? 'bg-gray-800 font-semibold text-white hover:text-white'
-                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-                )}
-              >
-                <Icon size={16} className="flex-shrink-0" />
-                {!compact && <span>{item.label}</span>}
-              </Link>
-            );
-          })}
-        </div>
-      ))}
+    <nav aria-label="Main" className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
+      {NAV_ITEMS.map((item) => {
+        const Icon = item.icon;
+        const active = item.isActive(location.pathname, params);
+        return (
+          <Link
+            key={item.href}
+            to={item.href}
+            onClick={() => {
+              hideFlyout();
+              onNavigate?.();
+            }}
+            onMouseEnter={showFlyout(item.label)}
+            onMouseLeave={hideFlyout}
+            onFocus={showFlyout(item.label)}
+            onBlur={hideFlyout}
+            aria-label={compact ? item.label : undefined}
+            aria-current={active ? 'page' : undefined}
+            className={clsx(
+              'flex h-9 items-center gap-3 rounded-lg px-3 text-[13px]',
+              compact && 'justify-center',
+              active
+                ? 'bg-gray-800 font-semibold text-white hover:text-white'
+                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+            )}
+          >
+            <Icon size={16} className="flex-shrink-0" />
+            {!compact && <span>{item.label}</span>}
+          </Link>
+        );
+      })}
       {compact && flyout && (
         // Fixed, so the sidebar's overflow doesn't clip it.
         <div
@@ -82,7 +70,6 @@ const NavLinks: React.FC<{ compact?: boolean; onNavigate?: () => void }> = ({ co
           style={{ top: flyout.top }}
         >
           <span className="absolute -left-1 top-1/2 h-2 w-2 -translate-y-1/2 rotate-45 bg-gray-900" />
-          <span className="block text-[10px] font-semibold uppercase tracking-wider text-gray-400">{flyout.section}</span>
           <span className="block whitespace-nowrap text-[13px] font-medium text-white">{flyout.label}</span>
         </div>
       )}
