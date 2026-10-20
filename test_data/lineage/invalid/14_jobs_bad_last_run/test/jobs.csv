@@ -1,0 +1,2 @@
+job_name,scheduler_system,schedule_name,last_run_status,last_run,expected_completion,duration_seconds
+JOB_A,Control-M,DAILY,SUCCESS,yesterday,,

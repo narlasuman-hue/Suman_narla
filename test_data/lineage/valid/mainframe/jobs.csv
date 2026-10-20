@@ -1,0 +1,7 @@
+job_name,owner,description,job_class,scheduler_system,schedule_name,frequency,last_run,last_run_status,return_code,duration_seconds,expected_completion,next_run
+MFEXT01,ORDERS_TEAM,Weekly extract with absolute ISO times,A,CA-7,ORDERS-WEEKLY,WEEKLY,2026-01-05T01:00,success,CC 0000,900,,2027-01-04T01:00
+MFGDG01,ORDERS_TEAM,Appends to a GDG it also reads (INOUT); blank status means SUCCESS,A,CA-7,ORDERS-DAILY,DAILY,-6h,,CC 0000,1200,-5h,+18h
+TDLOAD1,FIN_DW_TEAM,FastLoad orders into Teradata staging,T,CA-7,ORDERS-DAILY,DAILY,-4h,FAILED,ABEND S0C7,95,-30m,+20h
+TDMERGE1,FIN_DW_TEAM,Reads its input in lower case: must still link to TDLOAD1,T,CA-7,ORDERS-DAILY,DAILY,-1d,SUCCESS,CC 0000,600,23:59,+20h
+TDRPT01,FIN_DW_TEAM,"Report, ""monthly"" view (quoted text with commas)",T,CA-7,ORDERS-DAILY,DAILY,-5m,RUNNING,,,,+1d
+MFORPHAN,ORDERS_TEAM,Job with no datasets at all,A,,,,,SUCCESS,,,,

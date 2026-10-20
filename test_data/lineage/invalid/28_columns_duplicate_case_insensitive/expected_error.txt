@@ -1,0 +1,1 @@
+line 3: duplicate column 'stg.a.id'

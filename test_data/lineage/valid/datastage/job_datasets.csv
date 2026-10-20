@@ -1,0 +1,7 @@
+job_name,step,dataset_name,direction,dataset_type
+dsj_ext_claims,SEQ_IN,/data/in/claims.dat,INPUT,FILE
+dsj_ext_claims,DB2_OUT,STAGE.CLAIMS_STG,OUTPUT,DB2
+dsj_merge_claims,DB2_IN,STAGE.CLAIMS_STG,INPUT,DB2
+dsj_merge_claims,DB2_MERGE,EDW.CLAIMS,INOUT,DB2
+dsj_load_mart,DB2_IN,EDW.CLAIMS,INPUT,DB2
+dsj_load_mart,DB2_OUT,MART.CLAIMS_MONTHLY,OUTPUT,DB2

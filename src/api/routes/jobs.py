@@ -92,7 +92,7 @@ async def get_job_executions(
     executions = (
         db.query(JobExecution)
         .filter(JobExecution.job_id == job_id)
-        .order_by(JobExecution.start_time.desc())
+        .order_by(JobExecution.start_time.is_(None).desc(), JobExecution.start_time.desc())
         .offset(skip)
         .limit(limit)
         .all()
@@ -102,7 +102,7 @@ async def get_job_executions(
         {
             "id": e.id,
             "job_id": e.job_id,
-            "start_time": e.start_time.isoformat(),
+            "start_time": e.start_time.isoformat() if e.start_time else None,
             "end_time": e.end_time.isoformat() if e.end_time else None,
             "status": e.status,
             "duration_seconds": e.duration_seconds,

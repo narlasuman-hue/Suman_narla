@@ -1,0 +1,1 @@
+line 2: invalid time '25:00' (HH:MM must be 00:00-23:59)

@@ -1,0 +1,1 @@
+line 2: direction 'WRITE' must be one of INPUT, OUTPUT, INOUT

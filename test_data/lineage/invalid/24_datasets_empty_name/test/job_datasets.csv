@@ -1,0 +1,2 @@
+job_name,step,dataset_name,direction,dataset_type
+JOB_A,OUT,,OUTPUT,ORACLE

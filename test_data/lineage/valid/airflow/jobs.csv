@@ -1,0 +1,5 @@
+job_name,owner,description,scheduler_system,schedule_name,frequency,last_run,last_run_status,duration_seconds,error_message,expected_completion,next_run
+extract.s3_orders,DATA_PLATFORM_TEAM,Copies s3://acme/Orders/ (capital O),Airflow,extract,HOURLY,-40m,SUCCESS,120,,-20m,+20m
+extract.s3_orders_lower,DATA_PLATFORM_TEAM,Copies s3://acme/orders/: a different object (URLs match exactly),Airflow,extract,HOURLY,-40m,SUCCESS,120,,-20m,+20m
+dbt.fct_orders,ANALYTICS_TEAM,Déploiement – données 📊 (Unicode description),Airflow,dbt_weekly,WEEKLY,-3d,FAILED,900,Numeric value 'N/A' is not recognized,-2d,+4d
+reverse_etl.push_orders,ANALYTICS_TEAM,Writes to Salesforce only: not a load job,Airflow,reverse_etl,DAILY,-1h,SUCCESS,30,,+5h,+23h

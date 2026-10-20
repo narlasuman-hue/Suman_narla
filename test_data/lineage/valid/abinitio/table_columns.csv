@@ -1,0 +1,10 @@
+dataset_name,column_name,data_type,description
+/data/raw/events,event_id,string,
+/data/raw/events,event_type,string,
+/data/raw/events,event_ts,string,
+/DATA/RAW/EVENTS,event_id,string,Different path (HDFS is case-sensitive): not a duplicate
+events_db.events_daily,event_id,bigint,
+events_db.events_daily,event_type,string,
+events_db.events_daily,event_date,date,
+/data/curated/events_agg,event_type,string,
+/data/curated/events_agg,event_count,bigint,

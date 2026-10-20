@@ -1,0 +1,11 @@
+graph_name,port,dataset_name,direction,dataset_type
+ing_events.mp,in0,/data/landing/events,INPUT,HDFS
+ing_events.mp,out0,/data/raw/events,OUTPUT,HDFS
+bld_events_daily.mp,in0,/data/raw/events,INPUT,HDFS
+bld_events_daily.mp,out0,events_db.events_daily,OUTPUT,HIVE
+bld_case_mismatch.mp,in0,/DATA/RAW/EVENTS,INPUT,HDFS
+bld_case_mismatch.mp,out0,events_db.case_check,OUTPUT,hive
+agg_events.mp,in0,EVENTS_DB.EVENTS_DAILY,INPUT,HIVE
+agg_events.mp,out0,/data/curated/events_agg,OUTPUT,HDFS
+chk_late.mp,in0,events_db.events_daily,INPUT,HIVE
+chk_late.mp,out0,events_db.late_check,OUTPUT,HIVE

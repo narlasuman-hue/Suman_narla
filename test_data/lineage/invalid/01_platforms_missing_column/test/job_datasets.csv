@@ -1,0 +1,5 @@
+job_name,step,dataset_name,direction,dataset_type
+JOB_A,IN,/in/a.csv,INPUT,FILE
+JOB_A,OUT,STG.A,OUTPUT,ORACLE
+JOB_B,IN,STG.A,INPUT,ORACLE
+JOB_B,OUT,DW.B,OUTPUT,ORACLE

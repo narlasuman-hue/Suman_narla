@@ -1,0 +1,6 @@
+graph_name,project,owner,description,scheduler_system,schedule_name,frequency,last_run,last_run_status,duration_seconds,error_message,expected_completion,next_run
+ing_events.mp,events_ingest,HADOOP_TEAM,Finished before its SLA (MET),Control-M,HDP-HOURLY,HOURLY,-50m,SUCCESS,600,,-30m,+10m
+bld_events_daily.mp,events_curated,HADOOP_TEAM,Reads the exact HDFS path written by ing_events.mp,Control-M,HDP-MONTHLY,MONTHLY,-3h,FAILED,1500,"Phase 2: Reformat 'rfmt_evt' rejected 12 records, ""bad date"" in event_ts",-2h,+29d
+bld_case_mismatch.mp,events_curated,HADOOP_TEAM,Reads /DATA/RAW/EVENTS: different case so NOT linked,Control-M,HDP-DAILY,DAILY,-2h,SUCCESS,300,,,+22h
+agg_events.mp,events_curated,HADOOP_TEAM,Reads EVENTS_DB.EVENTS_DAILY in upper case: linked,Control-M,HDP-DAILY,DAILY,-15m,RUNNING,,,+10m,+1d
+chk_late.mp,events_qa,HADOOP_TEAM,Finished one hour after its SLA (COMPLETED_LATE),Autosys,HDP-QA,DAILY,-3h,SUCCESS,7200,,-2h,+21h

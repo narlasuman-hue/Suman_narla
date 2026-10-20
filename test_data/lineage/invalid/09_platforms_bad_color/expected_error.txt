@@ -1,0 +1,1 @@
+line 2: color 'red' must be a hex color like #c2410c

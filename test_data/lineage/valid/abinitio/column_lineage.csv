@@ -1,0 +1,6 @@
+graph_name,source_dataset,source_column,target_dataset,target_column,transformation
+bld_events_daily.mp,/data/raw/events,event_id,events_db.events_daily,event_id,CAST AS BIGINT
+bld_events_daily.mp,/data/raw/events,event_type,events_db.events_daily,event_type,
+bld_events_daily.mp,/data/raw/events,event_ts,events_db.events_daily,event_date,TO_DATE(event_ts)
+agg_events.mp,EVENTS_DB.EVENTS_DAILY,event_type,/data/curated/events_agg,event_type,
+agg_events.mp,EVENTS_DB.EVENTS_DAILY,event_id,/data/curated/events_agg,event_count,COUNT(*)

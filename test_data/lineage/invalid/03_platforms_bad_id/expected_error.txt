@@ -1,0 +1,1 @@
+line 2: platform_id '1-BAD' must be letters, digits or _

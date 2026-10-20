@@ -1,0 +1,8 @@
+platform_id,folder,name,description,job_label,table_label,table_types,color
+MAINFRAME,mainframe,Mainframe → Teradata,"Edge cases: INOUT GDG, ISO and clock times, case-insensitive names",Mainframe job,Teradata table,TERADATA,#c2410c
+HADOOP_ABINITIO,abinitio,Ab Initio → Hadoop,"Edge cases: HDFS paths match exactly, completed-late SLA",Ab Initio graph,Hadoop table,HIVE;HDFS,#0f766e
+
+INFORMATICA_ORACLE,informatica,Informatica → Oracle,"Edge cases: no optional files, INOUT upsert, never-run job",Informatica workflow,Oracle table,ORACLE,#7c3aed
+AIRFLOW_SNOWFLAKE,airflow,Airflow → Snowflake,"Edge cases: URL names match exactly, Unicode, WEEKLY",Airflow task,Snowflake table,SNOWFLAKE,#0369a1
+DATASTAGE_DB2,datastage,DataStage → DB2,"Edge cases: INOUT column lineage, MONTHLY SLA, RUNNING without last_run",DataStage job,DB2 table,DB2,#4d7c0f
+ssis_sqlserver,SSIS-SQLServer,SSIS → SQL Server,"6th platform from files only: lower-case id, defaults for labels and color", , , sqlserver ; azuresql ;,

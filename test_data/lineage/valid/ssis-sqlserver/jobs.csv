@@ -1,0 +1,4 @@
+job_name,scheduler_system,schedule_name,last_run_status,last_run,expected_completion,duration_seconds,error_message
+pkg_load_customers,SQL Agent,NIGHTLY,FAILED,-2h,-1h,45,Violation of PRIMARY KEY constraint 'PK_Customer'
+pkg_build_mart,SQL Agent,NIGHTLY,SUCCESS,-26h,+1h,600,
+pkg_sync_azure,SQL Agent,NIGHTLY,SUCCESS,-25h,+2h,300,

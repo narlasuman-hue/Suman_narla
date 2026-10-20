@@ -225,7 +225,7 @@ class JobExecution(Base):
 
     id = Column(Integer, primary_key=True)
     job_id = Column(Integer, ForeignKey("jobs.id"), nullable=False, index=True)
-    start_time = Column(DateTime, nullable=False)
+    start_time = Column(DateTime)  # None: status reported without a run time
     end_time = Column(DateTime)
     status = Column(String(50))  # SUCCESS, FAILED, RUNNING
     duration_seconds = Column(Integer)
