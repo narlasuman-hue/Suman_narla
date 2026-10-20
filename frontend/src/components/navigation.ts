@@ -44,7 +44,7 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: FiClock,
         isActive: (path, params) => path === '/job-lineage' && params.get('tab') === 'sla',
       },
-      { label: 'Jobs', href: '/jobs', icon: FiServer, isActive: prefix('/jobs') },
+      { label: 'Jobs Tracking', href: '/jobs', icon: FiServer, isActive: prefix('/jobs') },
     ],
   },
   {

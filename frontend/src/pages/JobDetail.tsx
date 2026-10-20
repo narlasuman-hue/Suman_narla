@@ -56,7 +56,7 @@ const JobDetail: React.FC = () => {
   const backTo = platform ? `/jobs?platform=${platform.key}` : '/jobs';
   const backLink = (
     <Link to={backTo} className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
-      <FiArrowLeft size={15} /> {platform ? `${platform.name} jobs` : 'Jobs'}
+      <FiArrowLeft size={15} /> {platform ? `${platform.name} jobs` : 'Jobs Tracking'}
     </Link>
   );
 
