@@ -38,15 +38,11 @@ export const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
-/** Breadcrumb for the current page, e.g. ["Monitor", "Lineage Tracking"]. */
+/** Breadcrumb for the current page, e.g. ["Lineage Tracking"] or ["Jobs Tracking", "Job"]. */
 export const breadcrumb = (path: string, params: URLSearchParams): string[] => {
   for (const section of NAV_SECTIONS) {
     const item = section.items.find((i) => i.isActive(path, params));
-    if (item) {
-      return path.startsWith('/jobs/')
-        ? [section.title, item.label, 'Job']
-        : [section.title, item.label];
-    }
+    if (item) return path.startsWith('/jobs/') ? [item.label, 'Job'] : [item.label];
   }
   return [];
 };
