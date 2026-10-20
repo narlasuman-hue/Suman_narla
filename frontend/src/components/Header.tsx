@@ -24,7 +24,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuToggle, onMobileMenuToggle }) => 
     <header className="flex min-h-[64px] flex-wrap items-center gap-4 border-b border-gray-200 bg-white px-4 py-3 sm:px-6">
       <button
         onClick={onMenuToggle}
-        aria-label="Collapse sidebar"
+        aria-label="Toggle sidebar"
         className="hidden rounded-lg p-2 text-gray-600 hover:bg-gray-100 lg:block"
       >
         <FiMenu size={18} />

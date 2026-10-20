@@ -6,21 +6,43 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
+const SIDEBAR_KEY = 'sidebar-open';
+
+/** Remembered per browser; storage can be unavailable (private mode), so default to open. */
+const loadSidebarOpen = () => {
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) !== 'false';
+  } catch {
+    return true;
+  }
+};
+
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(loadSidebarOpen);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const toggleSidebar = () => {
+    const next = !sidebarOpen;
+    setSidebarOpen(next);
+    try {
+      localStorage.setItem(SIDEBAR_KEY, String(next));
+    } catch {
+      // Not remembered; it still toggles.
+    }
+  };
 
   return (
     <div className="flex h-screen bg-canvas">
       <Sidebar
         isOpen={sidebarOpen}
         isMobileOpen={mobileMenuOpen}
+        onToggle={toggleSidebar}
         onMobileClose={() => setMobileMenuOpen(false)}
       />
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Header
-          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+          onMenuToggle={toggleSidebar}
           onMobileMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
         />
         <main className="flex-1 overflow-auto">
