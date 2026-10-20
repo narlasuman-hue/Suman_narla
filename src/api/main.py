@@ -73,6 +73,10 @@ app.include_router(query_analysis.router, prefix="/api/v1", tags=["Query Analysi
 from src.api.routes import mainframe
 app.include_router(mainframe.router, prefix="/api/v1", tags=["Mainframe"])
 
+# Jobs of every lineage platform (list, detail, datasets)
+from src.api.routes import platform_jobs
+app.include_router(platform_jobs.router, prefix="/api/v1", tags=["Platform Jobs"])
+
 # Cross-platform job lineage (mainframe/Teradata + Hadoop Ab Initio)
 from src.api.routes import job_lineage
 app.include_router(job_lineage.router, prefix="/api/v1", tags=["Job Lineage"])

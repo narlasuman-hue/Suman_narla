@@ -44,7 +44,7 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: FiClock,
         isActive: (path, params) => path === '/job-lineage' && params.get('tab') === 'sla',
       },
-      { label: 'Mainframe jobs', href: '/mainframe', icon: FiServer, isActive: prefix('/mainframe') },
+      { label: 'Jobs', href: '/jobs', icon: FiServer, isActive: prefix('/jobs') },
     ],
   },
   {
@@ -70,7 +70,7 @@ export const breadcrumb = (path: string, params: URLSearchParams): string[] => {
   for (const section of NAV_SECTIONS) {
     const item = section.items.find((i) => i.isActive(path, params));
     if (item) {
-      return path.startsWith('/mainframe/jobs/')
+      return path.startsWith('/jobs/')
         ? [section.title, item.label, 'Job']
         : [section.title, item.label];
     }
