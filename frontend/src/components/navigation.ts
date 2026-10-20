@@ -33,7 +33,7 @@ export const NAV_SECTIONS: NavSection[] = [
     title: 'Monitor',
     items: [
       {
-        label: 'Job lineage',
+        label: 'Lineage Tracking',
         href: '/job-lineage',
         icon: FiLayers,
         isActive: (path, params) => path === '/job-lineage' && params.get('tab') !== 'sla',
@@ -65,7 +65,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
-/** Breadcrumb for the current page, e.g. ["Monitor", "Job lineage"]. */
+/** Breadcrumb for the current page, e.g. ["Monitor", "Lineage Tracking"]. */
 export const breadcrumb = (path: string, params: URLSearchParams): string[] => {
   for (const section of NAV_SECTIONS) {
     const item = section.items.find((i) => i.isActive(path, params));
