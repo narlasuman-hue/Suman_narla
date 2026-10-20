@@ -1,0 +1,9 @@
+job_name,step,dataset_name,direction,dataset_type
+extract.s3_orders,copy,s3://acme/Orders/,INPUT,S3
+extract.s3_orders,copy,RAW.SALES.ORDERS,OUTPUT,SNOWFLAKE
+extract.s3_orders_lower,copy,s3://acme/orders/,INPUT,S3
+extract.s3_orders_lower,copy,RAW.SALES.ORDERS_LOWER,OUTPUT,SNOWFLAKE
+dbt.fct_orders,run,raw.sales.orders,INPUT,SNOWFLAKE
+dbt.fct_orders,run,ANALYTICS.MARTS.FCT_ORDERS,OUTPUT,SNOWFLAKE
+reverse_etl.push_orders,read,ANALYTICS.MARTS.FCT_ORDERS,INPUT,SNOWFLAKE
+reverse_etl.push_orders,push,salesforce://Opportunity,OUTPUT,API

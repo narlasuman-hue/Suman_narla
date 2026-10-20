@@ -1,0 +1,7 @@
+job_name,step,dataset_name,direction,dataset_type
+pkg_load_customers,Flat File Source,/in/customers.csv,INPUT,FILE
+pkg_load_customers,OLE DB Destination,DW.CUSTOMER_DIM,OUTPUT,SQLSERVER
+pkg_build_mart,OLE DB Source,DW.CUSTOMER_DIM,INPUT,SQLSERVER
+pkg_build_mart,OLE DB Destination,mart.CustomerSummary,OUTPUT,SQLSERVER
+pkg_sync_azure,OLE DB Source,MART.CUSTOMERSUMMARY,INPUT,SQLSERVER
+pkg_sync_azure,ADO NET Destination,cloud.CustomerSummary,OUTPUT,AzureSQL

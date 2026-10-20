@@ -1,0 +1,5 @@
+job_name,owner,description,scheduler_system,schedule_name,frequency,last_run,last_run_status,duration_seconds,error_message,expected_completion,next_run
+wf_stg_customers,RETAIL_ETL_TEAM,Stage customers from the CRM,Control-M,RETAIL-DAILY,DAILY,-6h,SUCCESS,300,,-5h,+18h
+wf_upsert_customer_dim,RETAIL_ETL_TEAM,Upsert dimension: reads and writes it (INOUT),Control-M,RETAIL-DAILY,DAILY,-5h, failed ,1200,ORA-00001: unique constraint (DW.PK_CUST) violated,2026-01-01T06:00,+19h
+wf_exp_customers,RETAIL_ETL_TEAM,Never run yet: no times and blank scheduler,,,,,,,,,
+wf_audit_only,AUDIT_TEAM,Only reads a table: writes nothing,Control-M,AUDIT,DAILY,-2h,SUCCESS,60,,,+22h

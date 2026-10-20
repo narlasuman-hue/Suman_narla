@@ -1,0 +1,4 @@
+job_name,source_dataset,source_column,target_dataset,target_column,transformation
+extract.s3_orders,s3://acme/Orders/,order_id,RAW.SALES.ORDERS,ORDER_ID,UPPER(order_id)
+dbt.fct_orders,RAW.SALES.ORDERS,ORDER_ID,analytics.marts.fct_orders,ORDER_ID,
+dbt.fct_orders,raw.sales.orders,AMOUNT_USD,ANALYTICS.MARTS.FCT_ORDERS,REVENUE_USD,SUM(AMOUNT_USD)

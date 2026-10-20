@@ -1,0 +1,6 @@
+job_name,source_dataset,source_column,target_dataset,target_column,transformation
+dsj_merge_claims,STAGE.CLAIMS_STG,CLAIM_ID,EDW.CLAIMS,CLAIM_ID,
+dsj_merge_claims,EDW.CLAIMS,PAID_AMT,EDW.CLAIMS,PAID_AMT,"COALESCE(new, old) (INOUT: reads and writes the same table)"
+dsj_merge_claims,STAGE.CLAIMS_STG,PAID_AMT,EDW.CLAIMS,PAID_AMT,"COALESCE(new, old) (INOUT: reads and writes the same table)"
+dsj_load_mart,EDW.CLAIMS,UPDATED_TS,MART.CLAIMS_MONTHLY,CLAIM_MONTH,TRUNC(UPDATED_TS)
+dsj_load_mart,EDW.CLAIMS,PAID_AMT,MART.CLAIMS_MONTHLY,TOTAL_PAID,SUM(PAID_AMT)

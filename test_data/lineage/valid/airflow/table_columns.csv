@@ -1,0 +1,7 @@
+dataset_name,column_name,data_type,description
+s3://acme/Orders/,order_id,string,
+s3://acme/orders/,order_id,string,Different URL (exact match): not a duplicate
+RAW.SALES.ORDERS,ORDER_ID,VARCHAR,
+RAW.SALES.ORDERS,AMOUNT_USD,"NUMBER(12,2)",
+ANALYTICS.MARTS.FCT_ORDERS,ORDER_ID,VARCHAR,
+ANALYTICS.MARTS.FCT_ORDERS,REVENUE_USD,"NUMBER(14,2)",

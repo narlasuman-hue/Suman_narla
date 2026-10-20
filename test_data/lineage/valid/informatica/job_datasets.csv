@@ -1,0 +1,8 @@
+job_name,step,dataset_name,direction,dataset_type
+wf_stg_customers,SQ_CUST,CRM.CUSTOMERS,INPUT,sqlserver
+wf_stg_customers,TGT_CUST,STG.CUSTOMERS_STG,OUTPUT,oracle
+wf_upsert_customer_dim,SQ_STG,STG.CUSTOMERS_STG,INPUT,ORACLE
+wf_upsert_customer_dim,UPD_DIM,DW.CUSTOMER_DIM,INOUT,ORACLE
+wf_exp_customers,SQ_DIM,dw.customer_dim,INPUT,ORACLE
+wf_exp_customers,FF_OUT,/outbound/customers_%Y%m%d.csv,OUTPUT,FILE
+wf_audit_only,SQ_DIM,DW.CUSTOMER_DIM,INPUT,ORACLE

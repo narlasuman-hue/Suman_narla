@@ -1,0 +1,3 @@
+dataset_name,column_name,data_type,description
+STG.A,ID,NUMBER,
+DW.B,,NUMBER,
