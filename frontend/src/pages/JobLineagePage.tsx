@@ -385,7 +385,7 @@ const JobLineagePage: React.FC = () => {
           { key: 'lineage' as const, label: 'Lineage', icon: FiGitBranch, badge: null },
           {
             key: 'sla' as const,
-            label: 'SLA tracking',
+            label: 'SLA Tracking',
             icon: FiClock,
             badge: summary ? { late: summary.sla_late, risk: summary.sla_at_risk } : null,
           },

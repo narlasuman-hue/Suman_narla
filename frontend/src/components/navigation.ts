@@ -39,7 +39,7 @@ export const NAV_SECTIONS: NavSection[] = [
         isActive: (path, params) => path === '/job-lineage' && params.get('tab') !== 'sla',
       },
       {
-        label: 'SLA tracking',
+        label: 'SLA Tracking',
         href: '/job-lineage?tab=sla',
         icon: FiClock,
         isActive: (path, params) => path === '/job-lineage' && params.get('tab') === 'sla',
