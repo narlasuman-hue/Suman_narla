@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { FiChevronsLeft, FiChevronsRight, FiLayers, FiX } from 'react-icons/fi';
+import { FiChevronsLeft, FiChevronsRight, FiX } from 'react-icons/fi';
 import clsx from 'clsx';
 import { NAV_SECTIONS } from './navigation';
 
@@ -17,18 +17,6 @@ interface Flyout {
   label: string;
   top: number;
 }
-
-const Brand: React.FC<{ compact?: boolean }> = ({ compact }) => (
-  <Link to="/" className="flex items-center gap-2.5 px-2 py-1 text-white hover:text-white">
-    <FiLayers size={24} className="flex-shrink-0 text-blue-400" />
-    {!compact && (
-      <span>
-        <span className="block text-[15px] font-bold leading-tight">Lineage Catalog</span>
-        <span className="block text-[11px] text-gray-400">Jobs · tables · SLAs</span>
-      </span>
-    )}
-  </Link>
-);
 
 const NavLinks: React.FC<{ compact?: boolean; onNavigate?: () => void }> = ({ compact, onNavigate }) => {
   const location = useLocation();
@@ -107,13 +95,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, isMobileOpen, onToggle, onMob
     {/* Desktop */}
     <aside
       className={clsx(
-        'hidden flex-col gap-4 overflow-hidden bg-gray-900 py-4 transition-all duration-300 lg:flex',
+        'hidden flex-col gap-4 overflow-hidden border-t border-gray-800 bg-gray-900 py-4 transition-all duration-300 lg:flex',
         isOpen ? 'w-60' : 'w-[72px]'
       )}
     >
-      <div className={clsx('px-3', !isOpen && 'flex justify-center')}>
-        <Brand compact={!isOpen} />
-      </div>
       <NavLinks compact={!isOpen} />
       <div className="border-t border-gray-800 px-3 pt-3">
         <button
@@ -140,7 +125,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, isMobileOpen, onToggle, onMob
     >
       <aside className="flex h-full w-64 flex-col gap-4 bg-gray-900 py-4 shadow-lg">
         <div className="flex items-center justify-between px-3">
-          <Brand />
+          <span className="px-2 text-[17px] font-bold tracking-tight text-white">TrailBlazers</span>
           <button
             onClick={onMobileClose}
             aria-label="Close menu"

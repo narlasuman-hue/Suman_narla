@@ -32,20 +32,20 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="flex h-screen bg-canvas">
-      <Sidebar
-        isOpen={sidebarOpen}
-        isMobileOpen={mobileMenuOpen}
-        onToggle={toggleSidebar}
-        onMobileClose={() => setMobileMenuOpen(false)}
+    <div className="flex h-screen flex-col bg-canvas">
+      <Header
+        onMenuToggle={toggleSidebar}
+        onMobileMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <Header
-          onMenuToggle={toggleSidebar}
-          onMobileMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
+      <div className="flex min-h-0 flex-1">
+        <Sidebar
+          isOpen={sidebarOpen}
+          isMobileOpen={mobileMenuOpen}
+          onToggle={toggleSidebar}
+          onMobileClose={() => setMobileMenuOpen(false)}
         />
-        <main className="flex-1 overflow-auto">
+        <main className="min-w-0 flex-1 overflow-auto">
           <div className="mx-auto max-w-[1600px] p-4 sm:p-6">{children}</div>
         </main>
       </div>

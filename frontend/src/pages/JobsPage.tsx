@@ -206,7 +206,7 @@ const JobsPage: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 text-gray-700">{job.owner || '—'}</td>
                     <td className="px-4 py-3">
-                      <div className="text-gray-900">{job.schedule_name || '—'}</div>
+                      <div className="whitespace-nowrap text-gray-900">{job.schedule_name || '—'}</div>
                       <div className="text-xs text-gray-600">
                         {[job.scheduler_system, job.frequency].filter(Boolean).join(' · ')}
                       </div>

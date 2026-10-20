@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { FiMenu, FiSearch } from 'react-icons/fi';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { FiLayers, FiMenu, FiSearch } from 'react-icons/fi';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { breadcrumb } from './navigation';
 
 interface HeaderProps {
@@ -21,27 +21,32 @@ const Header: React.FC<HeaderProps> = ({ onMenuToggle, onMobileMenuToggle }) => 
   };
 
   return (
-    <header className="flex min-h-[64px] flex-wrap items-center gap-4 border-b border-gray-200 bg-white px-4 py-3 sm:px-6">
+    <header className="flex min-h-[60px] flex-wrap items-center gap-x-4 gap-y-2 bg-gray-900 px-3 py-2.5 sm:px-4">
       <button
         onClick={onMenuToggle}
         aria-label="Toggle sidebar"
-        className="hidden rounded-lg p-2 text-gray-600 hover:bg-gray-100 lg:block"
+        className="hidden rounded-lg p-2 text-gray-300 hover:bg-gray-800 hover:text-white lg:block"
       >
         <FiMenu size={18} />
       </button>
       <button
         onClick={onMobileMenuToggle}
         aria-label="Open menu"
-        className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 lg:hidden"
+        className="rounded-lg p-2 text-gray-300 hover:bg-gray-800 hover:text-white lg:hidden"
       >
         <FiMenu size={18} />
       </button>
 
-      <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm">
+      <Link to="/" className="flex items-center gap-2 text-white hover:text-white" aria-label="TrailBlazers home">
+        <FiLayers size={22} className="text-blue-400" aria-hidden="true" />
+        <span className="text-[17px] font-bold tracking-tight">TrailBlazers</span>
+      </Link>
+
+      <nav aria-label="Breadcrumb" className="hidden items-center gap-2 border-l border-gray-700 pl-4 text-sm sm:flex">
         {crumbs.map((c, i) => (
           <React.Fragment key={c}>
-            {i > 0 && <span className="text-gray-400" aria-hidden="true">/</span>}
-            <span className={i === crumbs.length - 1 ? 'font-semibold text-gray-900' : 'text-gray-600'}>{c}</span>
+            {i > 0 && <span className="text-gray-500" aria-hidden="true">/</span>}
+            <span className={i === crumbs.length - 1 ? 'font-semibold text-white' : 'text-gray-400'}>{c}</span>
           </React.Fragment>
         ))}
       </nav>
@@ -50,14 +55,14 @@ const Header: React.FC<HeaderProps> = ({ onMenuToggle, onMobileMenuToggle }) => 
         <label htmlFor="global-search" className="sr-only">
           Search tables, columns and views
         </label>
-        <FiSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+        <FiSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
         <input
           id="global-search"
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search tables, columns, views"
-          className="h-9 w-full rounded-lg border border-gray-300 bg-gray-50 pl-9 pr-3 text-sm focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
+          className="h-9 w-full rounded-lg border border-gray-700 bg-gray-800 pl-9 pr-3 text-sm text-white placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
         />
       </form>
     </header>
