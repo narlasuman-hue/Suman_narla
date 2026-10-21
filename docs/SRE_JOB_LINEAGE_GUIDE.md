@@ -344,6 +344,19 @@ git clone https://github.com/narlasuman-hue/Suman_narla.git
 cd Suman_narla
 ```
 
+### Easiest on Windows: `run_demo.bat`
+After Step 1, open the `Suman_narla` folder in File Explorer and **double-click `run_demo.bat`**.
+If Windows shows "Windows protected your PC", click **More info → Run anyway**. The script:
+- checks that Python 3.12 and Node.js are installed, and says how to install either one if it's missing
+- installs the backend and frontend packages (first run only, 5–10 minutes)
+- opens two windows, **Lineage BACKEND** and **Lineage FRONTEND**. Keep both open during the demo
+- loads the demo data and opens **http://localhost:3000/job-lineage** in your browser
+
+To stop the demo, close the two "Lineage" windows. To start it again, double-click `run_demo.bat`.
+Later runs take about a minute.
+
+To start it by hand instead (any OS), follow Steps 2–4.
+
 ### Step 2: Backend (Terminal 1, keep it open)
 
 **Command Prompt (`C:\...>`):**
@@ -409,9 +422,9 @@ Wait for `Compiled successfully!` or `Compiled with warnings`. Warnings are fine
 3. You should see **"Synced 49 jobs across 5 platforms"**.
 
 ### Fresh start (e.g. on event day)
-1. Stop the backend with Ctrl+C.
+1. Stop the backend: press Ctrl+C, or close the "Lineage BACKEND" window.
 2. Delete `lineage_demo.db`.
-3. Start the backend again and click **Sync**.
+3. Start it again (or double-click `run_demo.bat`) and click **Sync** if the cards show 0 jobs.
 
 ---
 
@@ -448,6 +461,8 @@ About 10 minutes, the same order as the demo video (`Job_Lineage_Demo.mp4`).
 | `[eslint] 'FiSearch' is not defined` or runtime `FiSearch is not defined` | Your copy is older than PR #28. Run `git pull` on `main`, or add `FiSearch,` after `FiChevronRight,` in the `react-icons/fi` import in `frontend/src/pages/Dashboard.tsx`. |
 | PowerShell: `running scripts is disabled on this system` | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, then answer **Y**. |
 | Page loads but shows no platforms | The backend isn't running. Check Terminal 1. |
+| `run_demo.bat` says the backend or frontend did not start | Read the error in the "Lineage BACKEND" or "Lineage FRONTEND" window. If the pip step failed, delete the `venv` folder, make sure Python 3.12 is installed, and run it again. |
+| `localhost:3000` / `localhost:8000` "can't be reached" | The servers aren't running (windows closed or PC restarted). Double-click `run_demo.bat`. |
 | Sync shows `Invalid lineage input file: … line N: …` | Fix that line in that CSV file and sync again. |
 | A removed or renamed job still shows | Start with a fresh database: delete `lineage_demo.db` and re-sync. |
 
@@ -516,6 +531,7 @@ pytest tests/test_platforms.py tests/test_sla_and_columns.py tests/test_lineage_
 8. **Tested and documented it.** 113 lineage tests pass, including one that adds a new platform from files alone, and each platform was checked in the running app.
 9. **Fixed a Dashboard bug** found during local setup: the missing `FiSearch` import. *(PR #28, merged.)*
 10. **Wrote this guide** (`docs/SRE_JOB_LINEAGE_GUIDE.md`).
+11. **Added `run_demo.bat`**, a double-click starter for Windows.
 
 ---
 

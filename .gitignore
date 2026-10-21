@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Job Lineage demo database (created by run_demo.bat)
+lineage_demo.db
