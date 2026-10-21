@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import cytoscape, { Core, ElementDefinition } from 'cytoscape';
-import { FiMaximize } from 'react-icons/fi';
+import { FiMaximize, FiMinus, FiPlus } from 'react-icons/fi';
 import { LineageEdge, LineageNode } from '../services/api';
 
 interface LineageGraphProps {
@@ -11,14 +11,12 @@ interface LineageGraphProps {
   highlightIds: Set<string> | null;
   /** If fitting everything would be unreadable, center on this node instead. */
   centerId?: string | null;
-  /** The platform's color, used for its load jobs and tables. */
-  color: string;
   onSelect: (id: string | null) => void;
 }
 
 const COLUMN_GAP = 210;
 const LABELLED_COLUMN_GAP = 300; // room for job names on the arrows
-const ROW_GAP = 78;
+const ROW_GAP = 88;
 const MAX_FIT_ZOOM = 1.1;
 const MIN_READABLE_ZOOM = 0.75;
 
@@ -80,13 +78,21 @@ const layeredPositions = (nodes: LineageNode[], edges: LineageEdge[], columnGap:
   return positions;
 };
 
-const statusIcon: Record<string, string> = { FAILED: '✖ ', RUNNING: '▶ ' };
-const SLA_LATE = new Set(['LATE', 'COMPLETED_LATE']);
+/** Status line under a node's name, e.g. "FAILED · LATE". */
+const nodeTags = (n: LineageNode): string[] => {
+  if (n.type !== 'job') return n.impacted ? ['BLOCKED'] : [];
+  const tags: string[] = [];
+  if (n.run_status === 'FAILED') tags.push('FAILED');
+  if (n.run_status === 'RUNNING') tags.push('RUNNING');
+  if (n.impacted && n.run_status !== 'FAILED') tags.push('BLOCKED');
+  if (n.sla?.status === 'LATE') tags.push('LATE');
+  if (n.sla?.status === 'COMPLETED_LATE') tags.push('DONE LATE');
+  return tags;
+};
 
 const toElements = (
   nodes: LineageNode[],
-  edges: LineageEdge[],
-  color: string
+  edges: LineageEdge[]
 ): ElementDefinition[] => {
   const labelled = edges.some((e) => e.label);
   const columnGap = labelled ? LABELLED_COLUMN_GAP : COLUMN_GAP;
@@ -99,11 +105,12 @@ const toElements = (
 
   return [
     ...nodes.map((n) => {
-      const slaLate = n.type === 'job' && n.sla && SLA_LATE.has(n.sla.status) ? '⏰ ' : '';
-      const label =
+      const tags = nodeTags(n);
+      const detail =
         n.type === 'job'
-          ? `${slaLate}${statusIcon[n.run_status] || ''}${n.name}\n${n.scheduler_system || ''} · ${n.schedule_name || ''}`
-          : `${n.name}\n${n.subtitle ?? n.dataset_type ?? ''}`;
+          ? [n.scheduler_system, n.schedule_name].filter(Boolean).join(' · ')
+          : n.subtitle ?? n.dataset_type ?? '';
+      const label = [n.name, detail, tags.join(' · ')].filter(Boolean).join('\n');
       const classes = [
         n.impacted ? 'impacted' : '',
         n.type === 'dataset' && n.dataset_type === 'DATABASE' ? 'database' : '',
@@ -115,8 +122,8 @@ const toElements = (
           label,
           // JOB / LOAD for jobs; TABLE (the platform's tables) / SOURCE for datasets
           kind: n.type === 'job' ? n.job_type : n.is_table ? 'TABLE' : 'SOURCE',
-          color,
           status: n.type === 'job' ? n.run_status : '',
+          height: tags.length ? 66 : 52,
         },
         classes: classes.filter(Boolean).join(' '),
         position: positions[n.id],
@@ -144,33 +151,51 @@ const toElements = (
   ];
 };
 
+const FONT = 'Inter, system-ui, sans-serif';
+
+// Status comes first: failed (red), running (blue) and blocked by a failure
+// (orange, dashed) override the quiet base look of every node.
 const style: cytoscape.StylesheetJson = [
   {
     selector: 'node',
     style: {
       label: 'data(label)',
+      'font-family': FONT,
+      'font-weight': 500,
       'text-wrap': 'wrap',
-      'text-max-width': '156px',
+      'text-max-width': '164px',
       'text-overflow-wrap': 'anywhere',
       'text-valign': 'center',
       'text-halign': 'center',
-      'font-size': 12,
-      width: 170,
-      height: 54,
-      'border-width': 2,
+      'line-height': 1.35,
+      'font-size': 11.5,
+      color: '#0f172a',
+      width: 184,
+      height: 'data(height)',
+      'border-width': 1.5,
     },
   },
-  // Jobs: solid fill. Jobs that load the platform's tables take the platform's color.
-  { selector: 'node[kind="JOB"]', style: { shape: 'round-rectangle', 'background-color': '#3730a3', 'border-color': '#312e81', color: '#fff' } },
-  { selector: 'node[kind="LOAD"]', style: { shape: 'round-rectangle', 'background-color': 'data(color)', 'border-color': 'data(color)', color: '#fff' } },
-  // Datasets: light fill and colored border. The platform's tables take its color.
-  { selector: 'node[kind="SOURCE"]', style: { shape: 'barrel', 'background-color': '#f1f5f9', 'border-color': '#64748b', color: '#0f172a' } },
-  { selector: 'node[kind="TABLE"]', style: { shape: 'barrel', 'background-color': 'data(color)', 'background-opacity': 0.1, 'border-color': 'data(color)', color: '#111827' } },
+  // Structure stays neutral so colour always means status. Load jobs: grey cards.
+  { selector: 'node[kind="JOB"]', style: { shape: 'round-rectangle', 'background-color': '#ffffff', 'border-color': '#cbd5e1' } },
+  { selector: 'node[kind="LOAD"]', style: { shape: 'round-rectangle', 'background-color': '#f1f5f9', 'border-color': '#64748b' } },
+  // Datasets: barrels; the platform's tables get a darker border than sources.
+  { selector: 'node[kind="SOURCE"]', style: { shape: 'barrel', 'background-color': '#f8fafc', 'border-color': '#94a3b8', color: '#334155' } },
+  { selector: 'node[kind="TABLE"]', style: { shape: 'barrel', 'background-color': '#ffffff', 'border-color': '#475569', 'border-width': 2 } },
+  { selector: 'node.database', style: { shape: 'round-rectangle', 'border-width': 2.5, 'font-weight': 700 } },
+  // Blocked by an upstream failure
+  {
+    selector: 'node.impacted',
+    style: { 'background-color': '#fff7ed', 'background-opacity': 1, 'border-color': '#ea580c', 'border-width': 2.5, 'border-style': 'dashed', color: '#7c2d12' },
+  },
   // Run status
-  { selector: 'node[status="FAILED"]', style: { 'border-color': '#dc2626', 'border-width': 5 } },
-  { selector: 'node[status="RUNNING"]', style: { 'border-color': '#60a5fa', 'border-width': 4, 'border-style': 'dashed' } },
-  // Blast radius of failed jobs
-  { selector: 'node.impacted', style: { 'underlay-color': '#f59e0b', 'underlay-opacity': 0.45, 'underlay-padding': 7 } },
+  {
+    selector: 'node[status="FAILED"]',
+    style: { 'background-color': '#fef2f2', 'background-opacity': 1, 'border-color': '#dc2626', 'border-width': 3, 'border-style': 'solid', color: '#7f1d1d', 'font-weight': 600 },
+  },
+  {
+    selector: 'node[status="RUNNING"]',
+    style: { 'background-color': '#eff6ff', 'background-opacity': 1, 'border-color': '#2563eb', 'border-width': 3, 'border-style': 'solid', color: '#1e3a8a' },
+  },
   {
     selector: 'edge',
     style: {
@@ -178,6 +203,7 @@ const style: cytoscape.StylesheetJson = [
       'line-color': '#94a3b8',
       'target-arrow-color': '#94a3b8',
       'target-arrow-shape': 'triangle',
+      'arrow-scale': 1.1,
       'curve-style': 'bezier',
     },
   },
@@ -185,11 +211,12 @@ const style: cytoscape.StylesheetJson = [
     selector: 'edge[label]',
     style: {
       label: 'data(label)',
+      'font-family': FONT,
       'font-size': 10,
       color: '#334155',
       'text-background-color': '#ffffff',
-      'text-background-opacity': 0.9,
-      'text-background-padding': '2px',
+      'text-background-opacity': 0.95,
+      'text-background-padding': '3px',
       'text-background-shape': 'roundrectangle',
       'text-max-width': '110px',
       'text-wrap': 'ellipsis',
@@ -199,12 +226,12 @@ const style: cytoscape.StylesheetJson = [
     selector: 'edge.skip',
     style: { 'curve-style': 'unbundled-bezier', 'control-point-distances': [-55], 'control-point-weights': [0.5] },
   },
-  { selector: 'edge.impacted', style: { width: 3, 'line-color': '#f59e0b', 'target-arrow-color': '#f59e0b' } },
-  { selector: 'edge.failed', style: { width: 3, 'line-color': '#dc2626', 'target-arrow-color': '#dc2626', color: '#b91c1c' } },
-  { selector: 'node.database', style: { shape: 'round-rectangle', 'border-width': 3, 'font-weight': 'bold' } },
-  { selector: '.selected-node', style: { 'overlay-color': '#111827', 'overlay-opacity': 0.2, 'overlay-padding': 8 } },
-  { selector: '.dimmed', style: { opacity: 0.15 } },
+  { selector: 'edge.impacted', style: { width: 2.5, 'line-color': '#ea580c', 'target-arrow-color': '#ea580c' } },
+  { selector: 'edge.failed', style: { width: 2.5, 'line-color': '#dc2626', 'target-arrow-color': '#dc2626', color: '#b91c1c' } },
+  { selector: '.selected-node', style: { 'overlay-color': '#2563eb', 'overlay-opacity': 0.14, 'overlay-padding': 7 } },
+  { selector: '.dimmed', style: { opacity: 0.18 } },
 ];
+
 
 const LineageGraph: React.FC<LineageGraphProps> = ({
   nodes,
@@ -212,7 +239,6 @@ const LineageGraph: React.FC<LineageGraphProps> = ({
   selectedId,
   highlightIds,
   centerId,
-  color,
   onSelect,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -224,7 +250,7 @@ const LineageGraph: React.FC<LineageGraphProps> = ({
     if (!containerRef.current) return;
     const cy = cytoscape({
       container: containerRef.current,
-      elements: toElements(nodes, edges, color),
+      elements: toElements(nodes, edges),
       style,
       layout: { name: 'preset', fit: true, padding: 30 },
       minZoom: 0.15,
@@ -269,7 +295,7 @@ const LineageGraph: React.FC<LineageGraphProps> = ({
     };
     // Re-run only when the graph itself changes, not when the center hint does.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, edges, color]);
+  }, [nodes, edges]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -290,16 +316,33 @@ const LineageGraph: React.FC<LineageGraphProps> = ({
     });
   }, [selectedId, highlightIds, nodes, edges]);
 
+  const zoomBy = (factor: number) => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.zoom({ level: cy.zoom() * factor, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } });
+  };
+  const controls = [
+    { label: 'Zoom in', icon: FiPlus, onClick: () => zoomBy(1.25) },
+    { label: 'Zoom out', icon: FiMinus, onClick: () => zoomBy(0.8) },
+    { label: 'Fit to screen', icon: FiMaximize, onClick: () => cyRef.current?.fit(undefined, 30) },
+  ];
+
   return (
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
-      <button
-        onClick={() => cyRef.current?.fit(undefined, 30)}
-        title="Fit to screen"
-        className="absolute top-3 left-3 p-2 bg-white border border-gray-200 rounded-lg shadow-sm text-gray-600 hover:bg-gray-50"
-      >
-        <FiMaximize size={16} />
-      </button>
+      <div className="absolute bottom-3 right-3 flex flex-col divide-y divide-gray-200 overflow-hidden rounded-lg bg-white shadow">
+        {controls.map((c) => (
+          <button
+            key={c.label}
+            onClick={c.onClick}
+            title={c.label}
+            aria-label={c.label}
+            className="flex h-9 w-9 items-center justify-center text-gray-700 hover:bg-gray-50"
+          >
+            <c.icon size={15} />
+          </button>
+        ))}
+      </div>
     </div>
   );
 };

@@ -1,18 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import {
-  FiAlertOctagon,
-  FiClock,
-  FiColumns,
-  FiGitBranch,
-  FiGrid,
-  FiLayers,
-  FiPlayCircle,
-  FiRefreshCw,
-  FiServer,
-  FiX,
-  FiZap,
-} from 'react-icons/fi';
+import { FiClock, FiColumns, FiGitBranch, FiRefreshCw, FiX } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import {
   getColumnLineage,
@@ -29,9 +17,10 @@ import {
   LineageTableResult,
   PlatformInfo,
 } from '../services/api';
-import { StatCard } from '../components/StatCard';
 import LineageGraph from '../components/LineageGraph';
 import LineageDetailsPanel from '../components/LineageDetailsPanel';
+import AttentionPanel from '../components/AttentionPanel';
+import PlatformTabs from '../components/PlatformTabs';
 import TableSearch from '../components/TableSearch';
 import ColumnSearch from '../components/ColumnSearch';
 import ColumnSearchResults from '../components/ColumnSearchResults';
@@ -48,23 +37,18 @@ import {
 
 interface LegendItem {
   label: string;
-  className?: string;
-  style?: React.CSSProperties;
+  style: React.CSSProperties;
 }
 
-/** Legend for a platform's colors: plain jobs, load jobs, sources and its tables. */
-const platformLegend = (p: PlatformInfo): LegendItem[] => [
-  { label: p.job_label, style: { background: '#3730a3' } },
-  { label: `${p.job_label} loading ${p.table_label}s`, style: { background: p.color } },
-  { label: 'Source dataset / file', style: { background: '#f1f5f9', border: '2px solid #64748b' } },
-  { label: p.table_label, style: { background: `${p.color}1a`, border: `2px solid ${p.color}` } },
-];
-
-const statusLegend: LegendItem[] = [
-  { label: 'Failed run', className: 'bg-white border-4 border-red-600' },
-  { label: 'Running', className: 'bg-white border-4 border-dashed border-blue-400' },
-  { label: 'Impacted by failure', className: 'bg-amber-300' },
-  { label: '⏰ SLA late', className: 'hidden' },
+/** Legend in the graph's own colors: status first, then what each shape is. */
+const legend = (p: PlatformInfo): LegendItem[] => [
+  { label: 'Failed', style: { background: '#fef2f2', border: '2px solid #dc2626' } },
+  { label: 'Running', style: { background: '#eff6ff', border: '2px solid #2563eb' } },
+  { label: 'Blocked by a failure', style: { background: '#fff7ed', border: '2px dashed #ea580c' } },
+  { label: p.job_label, style: { background: '#fff', border: '1.5px solid #cbd5e1' } },
+  { label: `Loads ${p.table_label}s`, style: { background: '#f1f5f9', border: '1.5px solid #64748b' } },
+  { label: p.table_label, style: { background: '#fff', border: '2px solid #475569', borderRadius: 6 } },
+  { label: 'Source dataset / file', style: { background: '#f8fafc', border: '1.5px solid #94a3b8', borderRadius: 6 } },
 ];
 
 const VIEWS: { mode: LineageView; label: string; hint: string }[] = [
@@ -75,10 +59,10 @@ const VIEWS: { mode: LineageView; label: string; hint: string }[] = [
 ];
 
 const selectClass =
-  'px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50';
+  'h-[34px] px-2 text-[13px] border border-gray-300 rounded-lg bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:opacity-50';
 
 const segment = (active: boolean) =>
-  `px-3 py-2 ${active ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`;
+  `h-[34px] px-3 font-medium ${active ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`;
 
 interface ColumnSearchState {
   query: string;
@@ -95,7 +79,13 @@ const JobLineagePage: React.FC = () => {
   const platformInfo = platforms?.find((p) => p.key === platformKey) || platforms?.[0] || null;
   const platform = platformInfo?.id || '';
 
-  const [tab, setTab] = useState<'lineage' | 'sla'>('lineage');
+  const tab: 'lineage' | 'sla' = searchParams.get('tab') === 'sla' ? 'sla' : 'lineage';
+  const setTab = (next: 'lineage' | 'sla') => {
+    const params = new URLSearchParams(searchParams);
+    if (next === 'sla') params.set('tab', 'sla');
+    else params.delete('tab');
+    setSearchParams(params);
+  };
   const [graph, setGraph] = useState<JobLineageGraph | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -270,7 +260,7 @@ const JobLineagePage: React.FC = () => {
     setFocus(null);
     resetSelection();
     setColumnSearch(null);
-    setSearchParams({ platform: next.key });
+    setSearchParams(tab === 'sla' ? { platform: next.key, tab: 'sla' } : { platform: next.key });
   };
 
   const handleViewChange = (mode: LineageView) => {
@@ -280,7 +270,6 @@ const JobLineagePage: React.FC = () => {
   };
 
   const summary = graph?.summary;
-  const failedJobs = (graph?.nodes || []).filter((n) => n.type === 'job' && n.run_status === 'FAILED');
   const isEmpty = !loading && graph && graph.nodes.length === 0 && !focus;
 
   // Which details drawer (if any) goes next to the graph.
@@ -341,78 +330,62 @@ const JobLineagePage: React.FC = () => {
     );
   }
 
+  const health = summary
+    ? [
+        { label: `${platformInfo.job_label}s`, value: summary.jobs },
+        { label: `${platformInfo.table_label}s loaded`, value: summary.tables_loaded },
+        { label: 'Failed', value: summary.failed_jobs.length, tone: 'red' as const },
+        { label: 'Running', value: summary.running_jobs.length, tone: 'blue' as const },
+        { label: 'Blocked downstream', value: summary.impacted_jobs, tone: 'orange' as const },
+        { label: 'Late vs SLA', value: summary.sla_late, tone: 'red' as const, extra: `${summary.sla_at_risk} at risk` },
+      ]
+    : [];
+  const toneClass = { red: 'text-red-700', blue: 'text-blue-700', orange: 'text-orange-700' };
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <FiLayers className="text-indigo-600" size={32} />
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Job Lineage</h1>
-            <p className="text-gray-600">Choose a platform to see how its tables are loaded</p>
-          </div>
-        </div>
+    <div className="space-y-4">
+      {/* Platforms + sync */}
+      <div className="flex flex-wrap items-center gap-3">
+        <PlatformTabs platforms={platforms} activeId={platform} onChange={handlePlatformChange} />
         <button
           onClick={handleSync}
           disabled={syncing}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-50"
+          className="ml-auto flex h-9 items-center gap-2 rounded-lg bg-blue-700 px-3.5 text-sm font-medium text-white hover:bg-blue-800 disabled:opacity-50"
         >
-          <FiRefreshCw className={syncing ? 'animate-spin' : ''} size={18} />
-          {syncing ? 'Syncing...' : 'Sync job metadata'}
+          <FiRefreshCw className={syncing ? 'animate-spin' : ''} size={15} />
+          {syncing ? 'Syncing…' : 'Sync metadata'}
         </button>
       </div>
 
-      <div
-        className="grid gap-3"
-        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))' }}
-        role="tablist"
-        aria-label="Platform"
-      >
-        {platforms.map((p) => {
-          const active = p.id === platform;
-          return (
-            <button
-              key={p.id}
-              role="tab"
-              aria-selected={active}
-              onClick={() => handlePlatformChange(p)}
-              className={`relative flex flex-col gap-1 p-4 pl-5 rounded-lg border-2 text-left transition overflow-hidden ${
-                active ? 'border-indigo-600 bg-indigo-50 shadow' : 'border-gray-200 bg-white hover:border-indigo-300'
-              }`}
-            >
-              <span className="absolute left-0 inset-y-0 w-1.5" style={{ background: p.color }} aria-hidden="true" />
-              <span className={`font-bold ${active ? 'text-indigo-900' : 'text-gray-800'}`}>{p.name}</span>
-              <span className="text-xs text-gray-600">{p.description}</span>
-              <span className="flex flex-wrap items-center gap-1.5 mt-1 text-xs">
-                <span className="text-gray-600">{p.summary.jobs} jobs</span>
-                {p.summary.failed > 0 && (
-                  <span className="px-1.5 rounded bg-red-100 text-red-800 font-semibold">{p.summary.failed} failed</span>
-                )}
-                {p.summary.sla_late > 0 && (
-                  <span className="px-1.5 rounded bg-red-600 text-white font-semibold">{p.summary.sla_late} late</span>
-                )}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
+      {/* Health strip */}
       {summary && (
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-          <StatCard title={`${platformInfo.job_label}s`} value={summary.jobs} icon={FiServer} color="indigo" />
-          <StatCard title={`${platformInfo.table_label}s loaded`} value={summary.tables_loaded} icon={FiGrid} color="green" />
-          <StatCard title="Failed jobs" value={summary.failed_jobs.length} icon={FiAlertOctagon} color="red" />
-          <StatCard title="Running" value={summary.running_jobs.length} icon={FiPlayCircle} color="blue" />
-          <StatCard title="Impacted downstream" value={summary.impacted_jobs} icon={FiZap} color="orange" />
-          <StatCard title="Late vs SLA" value={summary.sla_late} icon={FiClock} color="red" />
-        </div>
+        <section
+          aria-label="Platform health"
+          className="grid overflow-hidden rounded-lg bg-white shadow"
+          style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}
+        >
+          {health.map((h) => {
+            const alert = h.tone === 'red' && h.value > 0;
+            return (
+              <div key={h.label} className={`border-r border-gray-100 px-4 py-3 last:border-r-0 ${alert ? 'bg-red-50' : ''}`}>
+                <div className={`text-xs ${alert ? 'font-semibold text-red-800' : 'text-gray-600'}`}>{h.label}</div>
+                <div className={`mt-0.5 text-2xl font-bold tabular-nums ${h.tone && h.value > 0 ? toneClass[h.tone] : 'text-gray-900'}`}>
+                  {h.value}
+                  {h.extra && <span className="ml-1.5 text-[13px] font-medium text-gray-600">· {h.extra}</span>}
+                </div>
+              </div>
+            );
+          })}
+        </section>
       )}
 
+      {/* Lineage | SLA */}
       <div className="flex gap-1 border-b border-gray-200" role="tablist" aria-label="View">
         {[
           { key: 'lineage' as const, label: 'Lineage', icon: FiGitBranch, badge: null },
           {
             key: 'sla' as const,
-            label: 'SLA tracking',
+            label: 'SLA Tracking',
             icon: FiClock,
             badge: summary ? { late: summary.sla_late, risk: summary.sla_at_risk } : null,
           },
@@ -422,16 +395,16 @@ const JobLineagePage: React.FC = () => {
             role="tab"
             aria-selected={tab === t.key}
             onClick={() => setTab(t.key)}
-            className={`flex items-center gap-2 px-4 py-2 -mb-px border-b-2 text-sm font-medium ${
-              tab === t.key ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-600 hover:text-gray-900'
+            className={`-mb-px flex items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium ${
+              tab === t.key ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-600 hover:text-gray-900'
             }`}
           >
-            <t.icon /> {t.label}
+            <t.icon size={15} /> {t.label}
             {t.badge && t.badge.late > 0 && (
-              <span className="px-1.5 rounded-full bg-red-600 text-white text-xs">{t.badge.late} late</span>
+              <span className="rounded bg-red-700 px-1.5 text-[11px] font-semibold text-white">{t.badge.late} late</span>
             )}
             {t.badge && t.badge.risk > 0 && (
-              <span className="px-1.5 rounded-full bg-amber-100 text-amber-900 text-xs">{t.badge.risk} at risk</span>
+              <span className="rounded bg-orange-100 px-1.5 text-[11px] font-semibold text-orange-900">{t.badge.risk} at risk</span>
             )}
           </button>
         ))}
@@ -453,62 +426,6 @@ const JobLineagePage: React.FC = () => {
         />
       ) : (
         <>
-          {failedJobs.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <FiAlertOctagon className="text-red-600" size={20} />
-              <span className="text-sm font-semibold text-red-900 mr-2">Failed jobs:</span>
-              {failedJobs.map((j) => (
-                <button
-                  key={j.id}
-                  onClick={() => handleShowImpact(j.id)}
-                  className="px-3 py-1 text-sm rounded-full bg-white border border-red-300 text-red-800 hover:bg-red-100"
-                >
-                  {j.name} — show blast radius
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div className="flex flex-wrap items-center gap-3 bg-white rounded-lg shadow p-4">
-            <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm" role="group" aria-label="Search by">
-              <button onClick={() => setSearchMode('table')} className={segment(searchMode === 'table')}>Table</button>
-              <button onClick={() => setSearchMode('column')} className={segment(searchMode === 'column')}>Column</button>
-            </div>
-            {searchMode === 'table' ? (
-              <TableSearch platform={platform} tableLabel={platformInfo.table_label} onSelect={(t: LineageTableResult) => showTableLineage(t.id)} />
-            ) : (
-              <ColumnSearch platform={platform} onSearch={runColumnSearch} />
-            )}
-            <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm" role="group" aria-label="Lineage level">
-              {VIEWS.map((v) => (
-                <button
-                  key={v.mode}
-                  title={v.hint}
-                  onClick={() => handleViewChange(v.mode)}
-                  className={segment(!columnFocus && viewMode === v.mode)}
-                >
-                  {v.label}
-                </button>
-              ))}
-            </div>
-            <select value={direction} onChange={(e) => setDirection(e.target.value as LineageDirection)} disabled={!focus || !!columnFocus} className={selectClass}>
-              <option value="both">Upstream + downstream</option>
-              <option value="upstream">Upstream only</option>
-              <option value="downstream">Downstream only</option>
-            </select>
-            <select value={depth} onChange={(e) => setDepth(e.target.value ? Number(e.target.value) : '')} disabled={!focus || !!columnFocus} className={selectClass}>
-              <option value="">All levels</option>
-              {[1, 2, 3, 5].map((d) => (
-                <option key={d} value={d}>{d} level{d > 1 ? 's' : ''}</option>
-              ))}
-            </select>
-            {focus && !columnFocus && (
-              <button onClick={() => { setFocus(null); setImpact(null); }} className="flex items-center gap-1 px-3 py-2 text-sm rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
-                Focused: {nodesById.get(focus)?.name || focus} <FiX />
-              </button>
-            )}
-          </div>
-
           {columnSearch && (
             <ColumnSearchResults
               {...columnSearch}
@@ -519,40 +436,107 @@ const JobLineagePage: React.FC = () => {
           )}
 
           {isEmpty ? (
-            <div className="bg-white rounded-lg shadow p-12 text-center text-gray-600">
-              No {platformInfo.job_label}s in the catalog yet. Click "Sync job metadata" to load them.
+            <div className="rounded-lg bg-white p-12 text-center text-gray-600 shadow">
+              No {platformInfo.job_label}s in the catalog yet. Click "Sync metadata" to load them.
             </div>
           ) : (
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              {columnFocus && (
-                <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-indigo-50 border-b border-indigo-100">
-                  <FiColumns className="text-indigo-600" />
-                  <p className="text-sm text-indigo-900">
-                    Column lineage:{' '}
-                    <span className="font-semibold break-all">
-                      {focusedColumn ? `${focusedColumn.dataset_name}.${focusedColumn.column}` : '…'}
-                    </span>
-                  </p>
-                  <select value={columnDirection} onChange={(e) => setColumnDirection(e.target.value as LineageDirection)} className={selectClass}>
-                    <option value="both">Sources + targets</option>
-                    <option value="upstream">Where it comes from</option>
-                    <option value="downstream">Where it goes</option>
-                  </select>
-                  <button
-                    onClick={() => { setColumnFocus(null); setSelectedId(null); }}
-                    className="ml-auto flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-100"
-                  >
-                    Back to {VIEWS.find((v) => v.mode === viewMode)?.label.toLowerCase()} view <FiX />
-                  </button>
+            <div className="flex flex-col gap-4 xl:flex-row">
+              {/* Graph */}
+              <section aria-label="Lineage graph" className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg bg-white shadow">
+                <div className="flex flex-wrap items-center gap-2.5 border-b border-gray-200 px-3.5 py-3">
+                  <div className="flex overflow-hidden rounded-lg border border-gray-300 text-[13px]" role="group" aria-label="Search by">
+                    <button onClick={() => setSearchMode('table')} className={segment(searchMode === 'table')}>Table</button>
+                    <button onClick={() => setSearchMode('column')} className={`border-l border-gray-200 ${segment(searchMode === 'column')}`}>Column</button>
+                  </div>
+                  {searchMode === 'table' ? (
+                    <TableSearch platform={platform} tableLabel={platformInfo.table_label} onSelect={(t: LineageTableResult) => showTableLineage(t.id)} />
+                  ) : (
+                    <ColumnSearch platform={platform} onSearch={runColumnSearch} />
+                  )}
+                  <div className="flex overflow-hidden rounded-lg border border-gray-300 text-[13px] xl:ml-auto" role="group" aria-label="Lineage level">
+                    {VIEWS.map((v, i) => (
+                      <button
+                        key={v.mode}
+                        title={v.hint}
+                        onClick={() => handleViewChange(v.mode)}
+                        className={`${i ? 'border-l border-gray-200 ' : ''}${segment(!columnFocus && viewMode === v.mode)}`}
+                      >
+                        {v.label}
+                      </button>
+                    ))}
+                  </div>
+                  <label className="flex items-center gap-1.5 text-xs text-gray-600">
+                    Direction
+                    <select value={direction} onChange={(e) => setDirection(e.target.value as LineageDirection)} disabled={!focus || !!columnFocus} className={selectClass}>
+                      <option value="both">Both</option>
+                      <option value="upstream">Upstream</option>
+                      <option value="downstream">Downstream</option>
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs text-gray-600">
+                    Depth
+                    <select value={depth} onChange={(e) => setDepth(e.target.value ? Number(e.target.value) : '')} disabled={!focus || !!columnFocus} className={selectClass}>
+                      <option value="">All</option>
+                      {[1, 2, 3, 5].map((d) => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
-              )}
-              <div className="relative h-[640px] bg-slate-50">
-                {/* The graph shrinks while the details drawer is open so nothing hides under it. */}
-                <div className={`absolute inset-y-0 left-0 ${drawer ? 'right-0 md:right-[384px]' : 'right-0'}`}>
+
+                {focus && !columnFocus && (
+                  <div className="flex flex-wrap items-center gap-2 border-b border-blue-100 bg-blue-50 px-3.5 py-2 text-[13px] text-blue-900">
+                    Focused on <span className="font-mono font-semibold">{nodesById.get(focus)?.name || focus}</span>
+                    <button
+                      onClick={() => { setFocus(null); setImpact(null); }}
+                      className="ml-auto flex h-[30px] items-center gap-1 rounded-lg border border-blue-200 bg-white px-2.5 text-xs font-medium text-blue-800 hover:bg-blue-100"
+                    >
+                      Show everything <FiX />
+                    </button>
+                  </div>
+                )}
+                {impact && !columnFocus && (
+                  <div className="flex flex-wrap items-center gap-2 border-b border-red-200 bg-red-50 px-3.5 py-2 text-[13px] text-red-900">
+                    Blast radius of <span className="font-mono font-semibold">{impact.node.name}</span>: what it blocks is highlighted, the rest is faded.
+                    <button
+                      onClick={() => setImpact(null)}
+                      className="ml-auto flex h-[30px] items-center gap-1 rounded-lg border border-red-200 bg-white px-2.5 text-xs font-medium text-red-800 hover:bg-red-100"
+                    >
+                      Clear <FiX />
+                    </button>
+                  </div>
+                )}
+                {columnFocus && (
+                  <div className="flex flex-wrap items-center gap-3 border-b border-blue-100 bg-blue-50 px-3.5 py-2">
+                    <FiColumns className="text-blue-700" />
+                    <p className="text-[13px] text-blue-900">
+                      Column lineage:{' '}
+                      <span className="break-all font-mono font-semibold">
+                        {focusedColumn ? `${focusedColumn.dataset_name}.${focusedColumn.column}` : '…'}
+                      </span>
+                    </p>
+                    <select value={columnDirection} onChange={(e) => setColumnDirection(e.target.value as LineageDirection)} className={selectClass}>
+                      <option value="both">Sources + targets</option>
+                      <option value="upstream">Where it comes from</option>
+                      <option value="downstream">Where it goes</option>
+                    </select>
+                    <button
+                      onClick={() => { setColumnFocus(null); setSelectedId(null); }}
+                      className="ml-auto flex h-[30px] items-center gap-1 rounded-lg border border-blue-200 bg-white px-2.5 text-xs font-medium text-blue-800 hover:bg-blue-100"
+                    >
+                      Back to {VIEWS.find((v) => v.mode === viewMode)?.label.toLowerCase()} view <FiX />
+                    </button>
+                  </div>
+                )}
+
+                <div
+                  className="relative h-[620px]"
+                  style={{ background: '#f8fafc radial-gradient(#e2e8f0 1px, transparent 1px) 0 0 / 18px 18px' }}
+                >
                   {loading || !shown ? (
-                    <div className="h-full flex items-center justify-center text-gray-500">Loading lineage…</div>
+                    <div className="flex h-full items-center justify-center text-gray-600">Loading lineage…</div>
                   ) : shown.nodes.length === 0 ? (
-                    <div className="h-full flex items-center justify-center text-gray-500">Nothing to show in this view.</div>
+                    <div className="flex h-full items-center justify-center text-gray-600">Nothing to show in this view.</div>
                   ) : (
                     <LineageGraph
                       nodes={shown.nodes}
@@ -560,29 +544,36 @@ const JobLineagePage: React.FC = () => {
                       selectedId={selectedId}
                       highlightIds={highlightIds}
                       centerId={centerId}
-                      color={platformInfo.color}
                       onSelect={handleSelect}
                     />
                   )}
                 </div>
-                {drawer && (
-                  <div className="absolute top-3 right-3 bottom-3 w-[360px] max-w-[calc(100%-24px)] overflow-y-auto">
-                    {drawer}
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 border-t border-gray-200">
-                {[...platformLegend(platformInfo), ...statusLegend].map((l) => (
-                  <span key={l.label} className="flex items-center gap-2 text-xs text-gray-600">
-                    <span className={`inline-block w-4 h-3 rounded-sm ${l.className || ''}`} style={l.style} />
-                    {l.label}
-                  </span>
-                ))}
-                {(columnFocus || viewMode === 'tables' || viewMode === 'databases') && (
-                  <span className="text-xs text-gray-600">Arrow label = job · red arrow = job failed</span>
-                )}
-                <span className="text-xs text-gray-400 ml-auto">Click a node for details · scroll to zoom · drag to pan</span>
-              </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-gray-200 px-3.5 py-2.5">
+                  {legend(platformInfo).map((l) => (
+                    <span key={l.label} className="flex items-center gap-1.5 text-xs text-gray-700">
+                      <span className="inline-block h-2.5 w-3.5 rounded-sm" style={l.style} aria-hidden="true" />
+                      {l.label}
+                    </span>
+                  ))}
+                  {(columnFocus || viewMode === 'tables' || viewMode === 'databases') && (
+                    <span className="text-xs text-gray-600">Arrow label = job · red arrow = job failed</span>
+                  )}
+                  <span className="ml-auto text-xs text-gray-600">Click a node for details · scroll to zoom · drag to pan</span>
+                </div>
+              </section>
+
+              {/* Details, or what needs attention */}
+              <aside className="w-full flex-shrink-0 xl:w-[360px]">
+                <div className="xl:sticky xl:top-0 xl:max-h-[760px] xl:overflow-y-auto">
+                  {drawer || (
+                    <AttentionPanel
+                      nodes={graph?.nodes || []}
+                      onShowImpact={handleShowImpact}
+                      onSelect={(id) => handleSelect(id)}
+                    />
+                  )}
+                </div>
+              </aside>
             </div>
           )}
         </>

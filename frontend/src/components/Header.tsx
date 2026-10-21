@@ -1,6 +1,7 @@
 import React from 'react';
-import { FiMenu, FiX, FiSearch } from 'react-icons/fi';
-import { Link } from 'react-router-dom';
+import { FiLayers, FiMenu } from 'react-icons/fi';
+import { Link, useLocation } from 'react-router-dom';
+import { breadcrumb } from './navigation';
 
 interface HeaderProps {
   onMenuToggle: () => void;
@@ -8,47 +9,39 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ onMenuToggle, onMobileMenuToggle }) => {
+  const location = useLocation();
+  const crumbs = breadcrumb(location.pathname, new URLSearchParams(location.search));
+
   return (
-    <header className="bg-white border-b border-gray-200 shadow-sm">
-      <div className="px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onMenuToggle}
-            className="hidden lg:block p-2 text-gray-600 hover:bg-gray-100 rounded"
-          >
-            <FiMenu size={20} />
-          </button>
+    <header className="flex min-h-[60px] flex-wrap items-center gap-x-4 gap-y-2 bg-gray-900 px-3 py-2.5 sm:px-4">
+      <button
+        onClick={onMenuToggle}
+        aria-label="Toggle sidebar"
+        className="hidden rounded-lg p-2 text-gray-300 hover:bg-gray-800 hover:text-white lg:block"
+      >
+        <FiMenu size={18} />
+      </button>
+      <button
+        onClick={onMobileMenuToggle}
+        aria-label="Open menu"
+        className="rounded-lg p-2 text-gray-300 hover:bg-gray-800 hover:text-white lg:hidden"
+      >
+        <FiMenu size={18} />
+      </button>
 
-          <button
-            onClick={onMobileMenuToggle}
-            className="lg:hidden p-2 text-gray-600 hover:bg-gray-100 rounded"
-          >
-            <FiMenu size={20} />
-          </button>
+      <Link to="/" className="flex items-center gap-2 text-white hover:text-white" aria-label="TrailBlazers home">
+        <FiLayers size={22} className="text-blue-400" aria-hidden="true" />
+        <span className="text-[17px] font-bold tracking-tight">TrailBlazers</span>
+      </Link>
 
-          <Link to="/" className="text-xl font-bold text-blue-600">
-            Database Catalog
-          </Link>
-        </div>
-
-        <div className="flex-1 max-w-md mx-4">
-          <Link to="/search" className="w-full">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search assets..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                onClick={(e) => e.currentTarget.focus()}
-              />
-              <FiSearch className="absolute right-3 top-2.5 text-gray-400" size={18} />
-            </div>
-          </Link>
-        </div>
-
-        <div className="text-sm text-gray-600">
-          Connected to Teradata
-        </div>
-      </div>
+      <nav aria-label="Breadcrumb" className="hidden items-center gap-2 border-l border-gray-700 pl-4 text-sm sm:flex">
+        {crumbs.map((c, i) => (
+          <React.Fragment key={c}>
+            {i > 0 && <span className="text-gray-500" aria-hidden="true">/</span>}
+            <span className={i === crumbs.length - 1 ? 'font-semibold text-white' : 'text-gray-400'}>{c}</span>
+          </React.Fragment>
+        ))}
+      </nav>
     </header>
   );
 };

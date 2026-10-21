@@ -344,11 +344,13 @@ export const getJobExecutions = async (
   return response.data;
 };
 
-// ============ Mainframe ============
+// ============ Platform jobs (every lineage platform) ============
 
-export interface MainframeJob {
+export interface PlatformJob {
   id: number;
   job_name: string;
+  /** Platform id, e.g. MAINFRAME or AIRFLOW_SNOWFLAKE */
+  platform: string;
   owner?: string;
   status: string;
   description?: string;
@@ -357,13 +359,17 @@ export interface MainframeJob {
   schedule_name?: string;
   frequency?: string;
   last_run?: string;
+  /** SUCCESS, FAILED or RUNNING; null when the job has not run */
+  last_run_status?: string | null;
+  last_run_error?: string | null;
   next_run?: string;
   last_synced?: string;
   file_count?: number;
 }
 
-export interface MainframeJobFile {
+export interface PlatformJobFile {
   id: number;
+  /** DD name, step or port */
   dd_name?: string;
   dataset_name: string;
   disposition?: string;
@@ -372,46 +378,20 @@ export interface MainframeJobFile {
   volume_serial?: string;
 }
 
-export interface MainframeJobSchedule {
-  job_id: number;
-  job_name: string;
-  scheduler_system?: string;
-  schedule_name?: string;
-  frequency?: string;
-  last_run?: string;
-  next_run?: string;
-}
-
-export const getMainframeJobs = async (
-  status?: string,
-  scheduleName?: string,
-  skip: number = 0,
-  limit: number = 50
-) => {
-  const params: any = { skip, limit };
-  if (status) params.status = status;
-  if (scheduleName) params.schedule_name = scheduleName;
-  const response = await apiClient.get<MainframeJob[]>('/mainframe/jobs', { params });
+export const getPlatformJobs = async (platform: string, runStatus?: string) => {
+  const params: any = { limit: 1000 };
+  if (runStatus) params.run_status = runStatus;
+  const response = await apiClient.get<PlatformJob[]>(`/platforms/${platform}/jobs`, { params });
   return response.data;
 };
 
-export const getMainframeJob = async (id: number) => {
-  const response = await apiClient.get<MainframeJob>(`/mainframe/jobs/${id}`);
+export const getPlatformJob = async (platform: string, id: number) => {
+  const response = await apiClient.get<PlatformJob>(`/platforms/${platform}/jobs/${id}`);
   return response.data;
 };
 
-export const getMainframeJobFiles = async (id: number) => {
-  const response = await apiClient.get<MainframeJobFile[]>(`/mainframe/jobs/${id}/files`);
-  return response.data;
-};
-
-export const getMainframeJobSchedule = async (id: number) => {
-  const response = await apiClient.get<MainframeJobSchedule>(`/mainframe/jobs/${id}/schedule`);
-  return response.data;
-};
-
-export const syncMainframeJobs = async () => {
-  const response = await apiClient.post('/mainframe/sync');
+export const getPlatformJobFiles = async (platform: string, id: number) => {
+  const response = await apiClient.get<PlatformJobFile[]>(`/platforms/${platform}/jobs/${id}/files`);
   return response.data;
 };
 
