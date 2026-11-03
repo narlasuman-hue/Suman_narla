@@ -39,11 +39,13 @@ def test_shipped_platforms_file():
     platforms = {p.id: p for p in load_platforms(str(DEMO_DIR))}
     assert list(platforms) == [
         "MAINFRAME", "HADOOP_ABINITIO", "INFORMATICA_ORACLE", "AIRFLOW_SNOWFLAKE", "DATASTAGE_DB2",
+        "ASTRONOMER_AWS",
     ]
     assert platforms["HADOOP_ABINITIO"].table_types == {"HIVE", "HDFS"}
     assert platforms["AIRFLOW_SNOWFLAKE"].folder == "airflow"
     assert platforms["AIRFLOW_SNOWFLAKE"].is_table("snowflake")
     assert not platforms["AIRFLOW_SNOWFLAKE"].is_table("S3")
+    assert platforms["ASTRONOMER_AWS"].table_types == {"REDSHIFT", "GLUE"}
 
 
 def test_get_platform_unknown(tmp_path):
@@ -88,6 +90,8 @@ def test_platforms_file_missing_column(tmp_path):
          "bi_refresh.revenue_daily"),
         ("datastage", "DATASTAGE_DB2", "dsj_load_provider_dim", "dsj_ext_pharmacy",
          "dsj_load_claim_fact"),
+        ("astronomer", "ASTRONOMER_AWS", "redshift_load.fct_payments",
+         "clickstream.load_glue", "marts.revenue_daily"),
     ],
 )
 def test_new_demo_platforms(db, folder, platform_id, failed, running, late_downstream):
@@ -127,6 +131,27 @@ def test_tables_and_load_jobs_follow_table_types(db):
     assert "ANALYTICS.FINANCE.FCT_REVENUE" in tables
 
 
+def test_astronomer_aws_tables_and_databases(db):
+    """Redshift and Glue datasets are tables; S3 paths are sources grouped by bucket."""
+    sync_demo(db, "astronomer", "ASTRONOMER_AWS")
+    nodes = {n["name"]: n for n in JobLineageService(db).get_graph("ASTRONOMER_AWS")["nodes"]}
+
+    assert nodes["analytics.fct_payments"]["is_table"]  # REDSHIFT
+    assert nodes["lake.payments_raw"]["is_table"]  # GLUE
+    assert not nodes["s3://shopco-landing/payments/"]["is_table"]  # S3 source
+    assert nodes["analytics.fct_payments"]["database"] == "analytics"
+    assert nodes["lake.payments_raw"]["database"] == "lake"
+    assert nodes["s3://shopco-landing/payments/"]["database"] == "s3://shopco-landing"
+    assert nodes["redshift_load.fct_payments"]["job_type"] == "LOAD"
+    # UNLOADs to S3 only, so it loads no table
+    assert nodes["finance.unload_revenue"]["job_type"] == "JOB"
+
+    found = ColumnLineageService(db).search_columns("ASTRONOMER_AWS", "customer_id", exact=True)
+    assert {r["dataset_name"] for r in found} >= {
+        "lake.orders_raw", "analytics.fct_orders", "marts.customer_ltv",
+    }
+
+
 def test_column_search_on_new_platform(db):
     sync_demo(db, "datastage", "DATASTAGE_DB2")
     found = ColumnLineageService(db).search_columns("DATASTAGE_DB2", "MEMBER_ID", exact=True)
@@ -145,7 +170,7 @@ async def test_platforms_route(db, monkeypatch):
     platforms = await routes.list_job_lineage_platforms(db)
 
     by_id = {p["id"]: p for p in platforms}
-    assert len(platforms) == 5
+    assert len(platforms) == 6
     assert by_id["INFORMATICA_ORACLE"]["key"] == "informatica"
     assert by_id["INFORMATICA_ORACLE"]["table_label"] == "Oracle table"
     assert by_id["MAINFRAME"]["summary"] == {"jobs": 13, "failed": 2, "running": 1, "sla_late": 4}

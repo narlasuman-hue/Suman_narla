@@ -55,6 +55,7 @@ each one is a row in `platforms.csv`.
 | **Informatica → Oracle** | Informatica workflows | Oracle tables | 8 | Retail sales |
 | **Airflow → Snowflake** | Airflow and dbt tasks | Snowflake tables | 9 | SaaS analytics |
 | **DataStage → DB2** | DataStage jobs | DB2 tables | 8 | Health claims |
+| **Astronomer → AWS** | Astronomer (managed Airflow) DAG tasks | Redshift and Glue/Athena tables | 9 | E-commerce orders and payments |
 
 The selected platform is kept in the URL (`/job-lineage?platform=airflow`), so a view can be shared.
 
@@ -160,7 +161,8 @@ demo_data/lineage/
 │   └── column_lineage.csv
 ├── informatica/               same four files as mainframe/
 ├── airflow/
-└── datastage/
+├── datastage/
+└── astronomer/
 ```
 
 You can edit the files in Excel. Each file is checked as it loads, and an error shows the
@@ -274,6 +276,7 @@ PAYEXT01,PROD.PAYROLL.EMPLOYEE.MASTER,COST_CENTER,PROD.PAYROLL.GL.EXTRACT,COST_C
 | Informatica → Oracle | `wf_fact_sales` (ORA-01652) | `wf_agg_daily_sales` → `wf_exp_finance_feed` | `wf_stg_returns` |
 | Airflow → Snowflake | `dbt_finance.fct_revenue` (numeric value 'N/A') | `bi_refresh.revenue_daily`, `reverse_etl.push_revenue_to_crm` | `dbt_core.fct_sessions` |
 | DataStage → DB2 | `dsj_load_provider_dim` (SQL0803N duplicate key) | `dsj_load_claim_fact` → `dsj_build_claims_mart` → `dsj_exp_regulatory` | `dsj_ext_pharmacy` |
+| Astronomer → AWS | `redshift_load.fct_payments` (Redshift COPY failed, see `stl_load_errors`) | `marts.revenue_daily` → `finance.unload_revenue`, `marts.customer_ltv` | `clickstream.load_glue` |
 
 **Good searches:**
 
@@ -284,10 +287,12 @@ PAYEXT01,PROD.PAYROLL.EMPLOYEE.MASTER,COST_CENTER,PROD.PAYROLL.GL.EXTRACT,COST_C
 | Tables | Informatica | `FACT_SALES` |
 | Tables | Airflow | `FCT_REVENUE` |
 | Tables | DataStage | `CLAIM_FACT` |
+| Tables | Astronomer → AWS | `fct_payments`, `revenue_daily` |
 | Columns | Mainframe | `CUSTOMER_ID` (8 tables) |
 | Columns | DataStage | `MEMBER_ID` (4 tables) |
 | Columns | Airflow | `REVENUE_USD`, `ACCOUNT_ID` |
 | Columns | Informatica | `ORDER_ID`, `CUSTOMER_NO` |
+| Columns | Astronomer → AWS | `customer_id` (7 tables) |
 
 ---
 
@@ -419,7 +424,7 @@ Wait for `Compiled successfully!` or `Compiled with warnings`. Warnings are fine
 ### Step 4: Load the demo data
 1. Open **http://localhost:3000/job-lineage**.
 2. Click **Sync job metadata** (top right).
-3. You should see **"Synced 49 jobs across 5 platforms"**.
+3. You should see **"Synced 58 jobs across 6 platforms"**.
 
 ### Fresh start (e.g. on event day)
 1. Stop the backend: press Ctrl+C, or close the "Lineage BACKEND" window.

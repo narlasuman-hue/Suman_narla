@@ -1,0 +1,10 @@
+job_name,owner,description,scheduler_system,schedule_name,frequency,last_run,last_run_status,duration_seconds,error_message,expected_completion,next_run
+orders.s3_to_glue,DATA_PLATFORM_TEAM,Register daily order files from S3 in the Glue catalog,Astronomer,orders,DAILY,-6h,SUCCESS,420,,-5h,+18h
+payments.s3_to_glue,PAYMENTS_DATA_TEAM,Register payment gateway files from S3 in the Glue catalog,Astronomer,payments,DAILY,-6h,SUCCESS,380,,-5h,+18h
+clickstream.load_glue,DATA_PLATFORM_TEAM,Load Firehose clickstream batches into the Glue catalog,Astronomer,clickstream,HOURLY,-14m,RUNNING,,,+6m,+46m
+redshift_load.fct_orders,ANALYTICS_ENG,COPY orders from the lake into Redshift,Astronomer,redshift_load,DAILY,-5h,SUCCESS,600,,-4h,+19h
+redshift_load.fct_payments,PAYMENTS_DATA_TEAM,COPY payments from the lake into Redshift,Astronomer,redshift_load,DAILY,-5h,FAILED,140,Load into table 'fct_payments' failed. Check 'stl_load_errors' system table for details.,-4h,+19h
+marts.revenue_daily,FINANCE_ANALYTICS,Build the daily revenue mart in Redshift,Astronomer,marts,DAILY,-27h,SUCCESS,300,,-30m,+1h
+marts.customer_ltv,GROWTH_ANALYTICS,Build customer lifetime value in Redshift,Astronomer,marts,DAILY,-26h,SUCCESS,420,,+2h,+2h
+finance.unload_revenue,FINANCE_ANALYTICS,UNLOAD daily revenue to the finance S3 bucket,Astronomer,finance,DAILY,-26h,SUCCESS,120,,+3h,+3h
+athena.sessions_daily,GROWTH_ANALYTICS,Build the daily sessions table queried in Athena,Astronomer,athena,HOURLY,-50m,SUCCESS,180,,+20m,+10m

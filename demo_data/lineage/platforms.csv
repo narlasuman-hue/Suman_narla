@@ -4,3 +4,4 @@ HADOOP_ABINITIO,abinitio,Ab Initio → Hadoop,Ab Initio graphs loading Hadoop ta
 INFORMATICA_ORACLE,informatica,Informatica → Oracle,Informatica workflows loading Oracle tables,Informatica workflow,Oracle table,ORACLE,#7c3aed
 AIRFLOW_SNOWFLAKE,airflow,Airflow → Snowflake,Airflow tasks loading Snowflake tables,Airflow task,Snowflake table,SNOWFLAKE,#0369a1
 DATASTAGE_DB2,datastage,DataStage → DB2,DataStage jobs loading DB2 tables,DataStage job,DB2 table,DB2,#4d7c0f
+ASTRONOMER_AWS,astronomer,Astronomer → AWS,Astronomer DAGs loading AWS Redshift and Glue tables,Astronomer task,AWS table,REDSHIFT;GLUE,#be185d

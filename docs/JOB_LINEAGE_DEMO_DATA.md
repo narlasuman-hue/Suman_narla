@@ -19,13 +19,15 @@ demo_data/lineage/
 │   ├── table_columns.csv    optional: the columns of each table/path
 │   └── column_lineage.csv   optional: source column → target column, per graph
 ├── informatica/             Informatica → Oracle  ┐
-├── airflow/                 Airflow → Snowflake   ├ same four files as mainframe/
-└── datastage/               DataStage → DB2       ┘
+├── airflow/                 Airflow → Snowflake   │
+├── datastage/               DataStage → DB2       ├ same four files as mainframe/
+└── astronomer/              Astronomer → AWS      ┘
 ```
 
-The repo already contains a filled-in demo set for five platforms: 13 mainframe jobs
+The repo already contains a filled-in demo set for six platforms: 13 mainframe jobs
 and 11 Ab Initio graphs (banking), 8 Informatica workflows (retail), 9 Airflow tasks
-(SaaS analytics) and 8 DataStage jobs (health claims). Each platform has failures, a
+(SaaS analytics), 8 DataStage jobs (health claims) and 9 Astronomer tasks on AWS
+(e-commerce: S3, Glue/Athena and Redshift). Each platform has failures, a
 running job, downstream impact and late SLAs. You can use the files as they are, or
 edit them to match your own jobs.
 
@@ -212,6 +214,7 @@ used by `DATABASE_URL`.
 | Informatica → Oracle | `wf_fact_sales` (ORA-01652 temp segment) | `wf_agg_daily_sales` → `wf_exp_finance_feed` (`DW.FACT_SALES`, `MART.DAILY_SALES_AGG`, the finance feed file) | `wf_stg_returns` |
 | Airflow → Snowflake | `dbt_finance.fct_revenue` (numeric value 'N/A') | `bi_refresh.revenue_daily`, `reverse_etl.push_revenue_to_crm` (`ANALYTICS.MARTS.REVENUE_DAILY`, `salesforce://Opportunity`) | `dbt_core.fct_sessions` |
 | DataStage → DB2 | `dsj_load_provider_dim` (SQL0803N duplicate key) | `dsj_load_claim_fact` → `dsj_build_claims_mart` → `dsj_exp_regulatory` (`EDW.CLAIM_FACT`, `MART.CLAIMS_SUMMARY`, the regulatory report) | `dsj_ext_pharmacy` |
+| Astronomer → AWS | `redshift_load.fct_payments` (Redshift COPY failed, see `stl_load_errors`) | `marts.revenue_daily` → `finance.unload_revenue`, and `marts.customer_ltv` (`analytics.fct_payments`, the revenue export in S3) | `clickstream.load_glue` |
 
 SLA story: on Mainframe → Teradata, `CRDTXN01` and `TDLNSLD1` are **late** (failed); `TDCRDLD1` is **late** because
 it is blocked by `CRDTXN01`; `TDGLPST1` **completed 10 minutes late**; four jobs are **at risk**. On Ab Initio →
@@ -229,3 +232,4 @@ Good tables to search during the demo:
 - Informatica → Oracle: `FACT_SALES`, `DAILY_SALES_AGG`
 - Airflow → Snowflake: `FCT_REVENUE`, `APP_EVENTS`
 - DataStage → DB2: `CLAIM_FACT`, `PROVIDER_DIM`
+- Astronomer → AWS: `fct_payments`, `revenue_daily`
