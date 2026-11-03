@@ -149,8 +149,9 @@ async def test_sync_route_uses_files_when_present(db, monkeypatch):
         "INFORMATICA_ORACLE": 8,
         "AIRFLOW_SNOWFLAKE": 9,
         "DATASTAGE_DB2": 8,
+        "ASTRONOMER_AWS": 9,
     }
-    assert stats["jobs_synced"] == 49
+    assert stats["jobs_synced"] == 58
 
 
 @pytest.mark.asyncio

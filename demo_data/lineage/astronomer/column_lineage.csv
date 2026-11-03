@@ -1,0 +1,33 @@
+job_name,source_dataset,source_column,target_dataset,target_column,transformation
+orders.s3_to_glue,s3://shopco-landing/orders/,order_id,lake.orders_raw,order_id,
+orders.s3_to_glue,s3://shopco-landing/orders/,customer_id,lake.orders_raw,customer_id,
+orders.s3_to_glue,s3://shopco-landing/orders/,order_ts,lake.orders_raw,order_ts,CAST(order_ts AS TIMESTAMP)
+orders.s3_to_glue,s3://shopco-landing/orders/,amount,lake.orders_raw,amount,"CAST(amount AS DECIMAL(12,2))"
+payments.s3_to_glue,s3://shopco-landing/payments/,payment_id,lake.payments_raw,payment_id,
+payments.s3_to_glue,s3://shopco-landing/payments/,order_id,lake.payments_raw,order_id,
+payments.s3_to_glue,s3://shopco-landing/payments/,amount,lake.payments_raw,amount,"CAST(amount AS DECIMAL(12,2))"
+payments.s3_to_glue,s3://shopco-landing/payments/,status,lake.payments_raw,status,
+clickstream.load_glue,s3://shopco-landing/clickstream/,session_id,lake.clickstream_raw,session_id,
+clickstream.load_glue,s3://shopco-landing/clickstream/,customer_id,lake.clickstream_raw,customer_id,
+clickstream.load_glue,s3://shopco-landing/clickstream/,event_ts,lake.clickstream_raw,event_ts,CAST(event_ts AS TIMESTAMP)
+clickstream.load_glue,s3://shopco-landing/clickstream/,page,lake.clickstream_raw,page,
+redshift_load.fct_orders,lake.orders_raw,order_id,analytics.fct_orders,order_id,
+redshift_load.fct_orders,lake.orders_raw,customer_id,analytics.fct_orders,customer_id,
+redshift_load.fct_orders,lake.orders_raw,order_ts,analytics.fct_orders,order_date,CAST(order_ts AS DATE)
+redshift_load.fct_orders,lake.orders_raw,amount,analytics.fct_orders,order_amount,
+redshift_load.fct_payments,lake.payments_raw,payment_id,analytics.fct_payments,payment_id,
+redshift_load.fct_payments,lake.payments_raw,order_id,analytics.fct_payments,order_id,
+redshift_load.fct_payments,lake.payments_raw,amount,analytics.fct_payments,paid_amount,
+redshift_load.fct_payments,lake.payments_raw,status,analytics.fct_payments,payment_status,UPPER(status)
+marts.revenue_daily,analytics.fct_orders,order_date,marts.revenue_daily,revenue_date,GROUP BY order_date
+marts.revenue_daily,analytics.fct_orders,order_amount,marts.revenue_daily,gross_revenue,SUM(order_amount)
+marts.revenue_daily,analytics.fct_payments,paid_amount,marts.revenue_daily,paid_revenue,SUM(paid_amount) of SETTLED payments
+marts.customer_ltv,analytics.fct_orders,customer_id,marts.customer_ltv,customer_id,GROUP BY customer_id
+marts.customer_ltv,analytics.fct_payments,paid_amount,marts.customer_ltv,lifetime_value,SUM(paid_amount) of SETTLED payments
+marts.customer_ltv,analytics.fct_orders,order_id,marts.customer_ltv,order_count,COUNT(DISTINCT order_id)
+finance.unload_revenue,marts.revenue_daily,revenue_date,s3://shopco-finance/exports/revenue/,revenue_date,
+finance.unload_revenue,marts.revenue_daily,gross_revenue,s3://shopco-finance/exports/revenue/,gross_revenue,
+finance.unload_revenue,marts.revenue_daily,paid_revenue,s3://shopco-finance/exports/revenue/,paid_revenue,
+athena.sessions_daily,lake.clickstream_raw,event_ts,lake.sessions_daily,session_date,DATE(event_ts)
+athena.sessions_daily,lake.clickstream_raw,customer_id,lake.sessions_daily,customer_id,
+athena.sessions_daily,lake.clickstream_raw,session_id,lake.sessions_daily,sessions,COUNT(DISTINCT session_id)

@@ -5,7 +5,7 @@
 The **Job Lineage** page (`/job-lineage` in the UI) covers **independent platforms**: one
 world of jobs and the tables they load. The user picks one at the top of the page and sees
 only that platform's lineage. Platforms are **configured, not coded** (see
-[Adding a platform](#adding-a-platform)). The demo ships five:
+[Adding a platform](#adding-a-platform)). The demo ships six:
 
 | Platform | Jobs | Tables they load | URL |
 |---|---|---|---|
@@ -14,6 +14,7 @@ only that platform's lineage. Platforms are **configured, not coded** (see
 | **Informatica → Oracle** | Informatica workflows | Oracle tables | `/job-lineage?platform=informatica` |
 | **Airflow → Snowflake** | Airflow / dbt tasks | Snowflake tables | `/job-lineage?platform=airflow` |
 | **DataStage → DB2** | DataStage jobs | DB2 tables | `/job-lineage?platform=datastage` |
+| **Astronomer → AWS** | Astronomer (managed Airflow) DAG tasks | Redshift tables and Glue/Athena tables | `/job-lineage?platform=astronomer` |
 
 The selected platform is kept in the URL, so you can share a link to one platform's view.
 Each platform card shows its job count, failed jobs and late SLAs.

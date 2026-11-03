@@ -1,0 +1,45 @@
+dataset_name,column_name,data_type,description
+s3://shopco-landing/orders/,order_id,string,Order number
+s3://shopco-landing/orders/,customer_id,string,Customer number
+s3://shopco-landing/orders/,order_ts,string,Order time as text
+s3://shopco-landing/orders/,amount,string,Order amount as text
+lake.orders_raw,order_id,string,Order number
+lake.orders_raw,customer_id,string,Customer number
+lake.orders_raw,order_ts,timestamp,Order time
+lake.orders_raw,amount,"decimal(12,2)",Order amount
+s3://shopco-landing/payments/,payment_id,string,Gateway payment number
+s3://shopco-landing/payments/,order_id,string,Order paid
+s3://shopco-landing/payments/,amount,string,Amount as text
+s3://shopco-landing/payments/,status,string,Gateway status
+lake.payments_raw,payment_id,string,Gateway payment number
+lake.payments_raw,order_id,string,Order paid
+lake.payments_raw,amount,"decimal(12,2)",Amount paid
+lake.payments_raw,status,string,Gateway status
+s3://shopco-landing/clickstream/,session_id,string,Web session
+s3://shopco-landing/clickstream/,customer_id,string,Signed-in customer
+s3://shopco-landing/clickstream/,event_ts,string,Event time as text
+s3://shopco-landing/clickstream/,page,string,Page viewed
+lake.clickstream_raw,session_id,string,Web session
+lake.clickstream_raw,customer_id,string,Signed-in customer
+lake.clickstream_raw,event_ts,timestamp,Event time
+lake.clickstream_raw,page,string,Page viewed
+analytics.fct_orders,order_id,VARCHAR(36),Order number
+analytics.fct_orders,customer_id,VARCHAR(36),Customer number
+analytics.fct_orders,order_date,DATE,Order date
+analytics.fct_orders,order_amount,"DECIMAL(12,2)",Order amount
+analytics.fct_payments,payment_id,VARCHAR(36),Gateway payment number
+analytics.fct_payments,order_id,VARCHAR(36),Order paid
+analytics.fct_payments,paid_amount,"DECIMAL(12,2)",Amount paid
+analytics.fct_payments,payment_status,VARCHAR(20),SETTLED / PENDING / FAILED
+marts.revenue_daily,revenue_date,DATE,Day
+marts.revenue_daily,gross_revenue,"DECIMAL(14,2)",Ordered amount
+marts.revenue_daily,paid_revenue,"DECIMAL(14,2)",Settled amount
+marts.customer_ltv,customer_id,VARCHAR(36),Customer number
+marts.customer_ltv,lifetime_value,"DECIMAL(14,2)",Total settled payments
+marts.customer_ltv,order_count,INTEGER,Orders placed
+s3://shopco-finance/exports/revenue/,revenue_date,string,Day
+s3://shopco-finance/exports/revenue/,gross_revenue,string,Ordered amount
+s3://shopco-finance/exports/revenue/,paid_revenue,string,Settled amount
+lake.sessions_daily,session_date,date,Day
+lake.sessions_daily,customer_id,string,Signed-in customer
+lake.sessions_daily,sessions,bigint,Sessions that day

@@ -14,7 +14,7 @@ DEMO_DIR = Path(__file__).resolve().parent.parent / "demo_data" / "lineage"
 
 @pytest.fixture
 def synced(db, monkeypatch):
-    """All five demo platforms synced into the catalog."""
+    """All six demo platforms synced into the catalog."""
     monkeypatch.setattr(lineage_routes.settings, "lineage_data_dir", str(DEMO_DIR))
     asyncio.run(lineage_routes.sync_job_lineage(db))
 
@@ -38,6 +38,7 @@ async def list_jobs(db, platform, **filters):
         ("INFORMATICA_ORACLE", 8, "wf_fact_sales"),
         ("AIRFLOW_SNOWFLAKE", 9, "dbt_finance.fct_revenue"),
         ("DATASTAGE_DB2", 8, "dsj_load_claim_fact"),
+        ("ASTRONOMER_AWS", 9, "redshift_load.fct_payments"),
     ],
 )
 async def test_each_platform_lists_its_own_jobs(db, synced, platform, count, sample):
