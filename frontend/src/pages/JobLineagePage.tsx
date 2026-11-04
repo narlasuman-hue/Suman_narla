@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import {
   getColumnLineage,
   getJobLineageGraph,
+  ALL_PLATFORMS,
   getLineagePlatforms,
   getJobLineageImpact,
   searchJobLineageColumns,
@@ -105,7 +106,7 @@ const JobLineagePage: React.FC = () => {
 
   const loadPlatforms = useCallback(async () => {
     try {
-      setPlatforms(await getLineagePlatforms());
+      setPlatforms(await getLineagePlatforms(true));
     } catch (error) {
       toast.error('Failed to load platforms');
       console.error(error);
@@ -333,7 +334,10 @@ const JobLineagePage: React.FC = () => {
   const health = summary
     ? [
         { label: `${platformInfo.job_label}s`, value: summary.jobs },
-        { label: `${platformInfo.table_label}s loaded`, value: summary.tables_loaded },
+        {
+          label: `${platformInfo.table_label.charAt(0).toUpperCase()}${platformInfo.table_label.slice(1)}s loaded`,
+          value: summary.tables_loaded,
+        },
         { label: 'Failed', value: summary.failed_jobs.length, tone: 'red' as const },
         { label: 'Running', value: summary.running_jobs.length, tone: 'blue' as const },
         { label: 'Blocked downstream', value: summary.impacted_jobs, tone: 'orange' as const },
@@ -345,8 +349,10 @@ const JobLineagePage: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Platforms + sync */}
-      <div className="flex flex-wrap items-center gap-3">
-        <PlatformTabs platforms={platforms} activeId={platform} onChange={handlePlatformChange} />
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <PlatformTabs platforms={platforms} activeId={platform} onChange={handlePlatformChange} />
+        </div>
         <button
           onClick={handleSync}
           disabled={syncing}
@@ -544,6 +550,7 @@ const JobLineagePage: React.FC = () => {
                       selectedId={selectedId}
                       highlightIds={highlightIds}
                       centerId={centerId}
+                      showPlatform={platform === ALL_PLATFORMS}
                       onSelect={handleSelect}
                     />
                   )}

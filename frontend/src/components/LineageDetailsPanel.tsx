@@ -29,6 +29,7 @@ interface Props {
 /** "Mainframe job · loads Teradata tables", "Teradata table", "Source dataset". */
 const nodeKindLabel = (node: LineageNode, platform: PlatformInfo) => {
   if (node.type === 'job') {
+    if (node.platform !== platform.id) return node.platform_label; // All platforms view
     return node.job_type === 'LOAD'
       ? `${platform.job_label} · loads ${platform.table_label}s`
       : platform.job_label;
@@ -133,6 +134,11 @@ const LineageDetailsPanel: React.FC<Props> = ({
         <div>
           <Row label="Type">{node.dataset_type || '-'}</Row>
           <Row label="Database">{node.database}</Row>
+          {node.also_known_as?.map((name) => (
+            <Row key={name} label={node.transfer_method || 'Sent as'}>
+              <span className="break-all text-right">{name}</span>
+            </Row>
+          ))}
           <Row label={writtenLabel}>{inputs.length} job(s)</Row>
           <Row label="Read by">{outputs.length} job(s)</Row>
         </div>
@@ -166,7 +172,7 @@ const LineageDetailsPanel: React.FC<Props> = ({
         </button>
         {node.type === 'job' && (
           <Link
-            to={`/jobs/${platform.key}/${node.catalog_id}`}
+            to={`/jobs/${node.platform_key ?? platform.key}/${node.catalog_id}`}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50"
           >
             <FiExternalLink size={14} /> Job details

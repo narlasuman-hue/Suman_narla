@@ -54,6 +54,21 @@ with the columns described in sections 1 and 2 (`job_name`, …). The step/port 
 `error_message` or `return_code`. Ab Initio's `graphs.csv` / `graph_datasets.csv` (with
 `graph_name`) also still work.
 
+## `platform_links.csv` (optional): hand-offs between platforms
+
+Used only by the **All platforms** view. One row per dataset that moves to another platform
+under a new name; the target is treated as the same dataset as the source.
+
+| Column | Required | Example |
+|---|---|---|
+| `source_dataset` | yes | `PROD.CARDS.TXN.DAILY` (written on the mainframe) |
+| `target_dataset` | yes | `/data/landing/cards/auth_feed` (read by Ab Initio) |
+| `method` | no | `NDM file transfer` |
+| `description` | no | `Daily card transactions sent to the Hadoop landing zone` |
+
+The demo links the mainframe card and customer extracts to the Ab Initio landing zone, so the
+`CRDTXN01` abend's blast radius reaches the Ab Initio fraud graphs.
+
 ## How the lineage is built
 
 Lineage comes from **matching dataset names**:

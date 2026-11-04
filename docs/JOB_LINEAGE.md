@@ -52,6 +52,29 @@ Then click **Sync job metadata**. The sync validates `platforms.csv` (unique ids
 colors, non-empty `table_types`) and reports the file, line and problem if something is wrong.
 Without a `platforms.csv`, the two original platforms (Mainframe, Ab Initio) are used.
 
+## All platforms view
+
+The **All platforms** tab (`/job-lineage?platform=all`, API `platform=ALL`) puts every
+platform's jobs in one graph and joins them where data flows from one platform to another:
+
+- A dataset with the **same name** on two platforms is one dataset (e.g. a Teradata table that
+  an Ab Initio graph reads).
+- A dataset that changes name on the way is joined by a row in **`platform_links.csv`**, in the
+  lineage data folder:
+
+  ```csv
+  source_dataset,target_dataset,method,description
+  PROD.CARDS.TXN.DAILY,/data/landing/cards/auth_feed,NDM file transfer,Card transactions sent to Hadoop
+  ```
+
+  In the All platforms view the target is the same dataset as the source: the node keeps the
+  source's name and shows the hand-off ("NDM file transfer: /data/landing/cards/auth_feed").
+
+Everything works across platforms there: blast radius (the demo's `CRDTXN01` abend reaches the
+Ab Initio fraud graphs), SLA "blocked by", Needs attention, table and column search, and the
+database view. Each job box names its platform. The single-platform tabs ignore
+`platform_links.csv` and are unchanged. Without the file, only same-name datasets join.
+
 ## Search table
 
 Each platform view has one **Search table** box:
@@ -101,7 +124,7 @@ failed or running upstream jobs are blocking it. SLA status also appears in job 
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/v1/job-lineage/platforms` | The configured platforms (id, URL key, name, labels, table types, color) with a summary: jobs, failed, running, SLA late |
+| GET | `/api/v1/job-lineage/platforms?include_all=` | The configured platforms (id, URL key, name, labels, table types, color) with a summary: jobs, failed, running, SLA late. With `include_all=true`, the All platforms view (id `ALL`) is listed last |
 | GET | `/api/v1/job-lineage/graph?platform=&focus=&direction=&depth=` | One platform's nodes, edges and summary. `platform` is required: a `platform_id` such as `MAINFRAME` or `AIRFLOW_SNOWFLAKE`. `focus` is a node id such as `job:12` or `dataset:FINANCE_DB.GL_POSTINGS`. `direction` is `upstream`, `downstream` or `both`. `depth` counts job levels. |
 | GET | `/api/v1/job-lineage/tables?platform=&q=&limit=` | Search the platform's tables (its `table_types`) by part of the name. Each result includes `loaded_by` and `read_by` jobs with their run status. |
 | GET | `/api/v1/job-lineage/sla?platform=` | SLA status of every job with an expected completion time, worst first, with `blocked_by` |

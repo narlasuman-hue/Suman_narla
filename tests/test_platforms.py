@@ -167,7 +167,7 @@ def test_column_search_on_new_platform(db):
 async def test_platforms_route(db, monkeypatch):
     monkeypatch.setattr(routes.settings, "lineage_data_dir", str(DEMO_DIR))
     await routes.sync_job_lineage(db)
-    platforms = await routes.list_job_lineage_platforms(db)
+    platforms = await routes.list_job_lineage_platforms(db=db, include_all=False)
 
     by_id = {p["id"]: p for p in platforms}
     assert len(platforms) == 6
@@ -202,7 +202,7 @@ async def test_brand_new_platform_from_files_only(db, monkeypatch, tmp_path):
     stats = await routes.sync_job_lineage(db)
     assert stats["platforms"]["SSIS_SQLSERVER"]["jobs_created"] == 2
 
-    (platform,) = await routes.list_job_lineage_platforms(db)
+    (platform,) = await routes.list_job_lineage_platforms(db=db, include_all=False)
     assert platform["name"] == "SSIS → SQL Server"
     assert platform["summary"]["failed"] == 1
 

@@ -11,6 +11,8 @@ interface LineageGraphProps {
   highlightIds: Set<string> | null;
   /** If fitting everything would be unreadable, center on this node instead. */
   centerId?: string | null;
+  /** All platforms view: label each job with its platform instead of its schedule. */
+  showPlatform?: boolean;
   onSelect: (id: string | null) => void;
 }
 
@@ -92,7 +94,8 @@ const nodeTags = (n: LineageNode): string[] => {
 
 const toElements = (
   nodes: LineageNode[],
-  edges: LineageEdge[]
+  edges: LineageEdge[],
+  showPlatform = false
 ): ElementDefinition[] => {
   const labelled = edges.some((e) => e.label);
   const columnGap = labelled ? LABELLED_COLUMN_GAP : COLUMN_GAP;
@@ -108,8 +111,12 @@ const toElements = (
       const tags = nodeTags(n);
       const detail =
         n.type === 'job'
-          ? [n.scheduler_system, n.schedule_name].filter(Boolean).join(' · ')
-          : n.subtitle ?? n.dataset_type ?? '';
+          ? showPlatform
+            ? n.platform_label
+            : [n.scheduler_system, n.schedule_name].filter(Boolean).join(' · ')
+          : n.also_known_as?.length
+            ? `${n.dataset_type ?? ''} · ${n.transfer_method || 'hand-off'}`.replace(/^ · /, '')
+            : n.subtitle ?? n.dataset_type ?? '';
       const label = [n.name, detail, tags.join(' · ')].filter(Boolean).join('\n');
       const classes = [
         n.impacted ? 'impacted' : '',
@@ -239,6 +246,7 @@ const LineageGraph: React.FC<LineageGraphProps> = ({
   selectedId,
   highlightIds,
   centerId,
+  showPlatform = false,
   onSelect,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -250,7 +258,7 @@ const LineageGraph: React.FC<LineageGraphProps> = ({
     if (!containerRef.current) return;
     const cy = cytoscape({
       container: containerRef.current,
-      elements: toElements(nodes, edges),
+      elements: toElements(nodes, edges, showPlatform),
       style,
       layout: { name: 'preset', fit: true, padding: 30 },
       minZoom: 0.15,
@@ -295,7 +303,7 @@ const LineageGraph: React.FC<LineageGraphProps> = ({
     };
     // Re-run only when the graph itself changes, not when the center hint does.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, edges]);
+  }, [nodes, edges, showPlatform]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -314,6 +322,11 @@ const LineageGraph: React.FC<LineageGraphProps> = ({
         });
       }
     });
+    // A big graph (e.g. All platforms) is unreadable when fitted whole: zoom to what is highlighted.
+    if (highlightIds?.size && cy.zoom() < MIN_READABLE_ZOOM) {
+      const highlighted = cy.nodes().filter((n) => highlightIds.has(n.id()));
+      if (highlighted.nonempty()) cy.fit(highlighted, 40);
+    }
   }, [selectedId, highlightIds, nodes, edges]);
 
   const zoomBy = (factor: number) => {

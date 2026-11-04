@@ -114,6 +114,12 @@ Type a column name such as `CUSTOMER_ID`. The results list every table that has 
 | **Jobs + tables** | Jobs and every table or file they read and write |
 | **Databases** | Database-level lineage |
 
+### All platforms view
+The **All platforms** tab joins every platform into one graph where data flows between them: datasets with the
+same name join automatically, and hand-offs that change name (e.g. an NDM transfer from the mainframe to Hadoop)
+are listed in `demo_data/lineage/platform_links.csv`. Blast radius, SLA "blocked by", search and the database
+view then cross platforms: the `CRDTXN01` abend reaches the Ab Initio fraud graphs.
+
 ---
 
 ## 4. How lineage is built
