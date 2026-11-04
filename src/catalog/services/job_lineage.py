@@ -15,6 +15,11 @@ A dataset whose ``dataset_type`` is one of the platform's ``table_types`` is a
 
 For SRE triage, every node downstream of a job whose latest run failed is
 flagged as impacted (the failure's blast radius).
+
+The special platform ``ALL`` builds one graph from every configured platform.
+Datasets with the same name join across platforms, and so do the hand-offs in
+``platform_links.csv`` (``src/catalog/platform_links.py``), so a failure's
+blast radius can cross from one platform into another.
 """
 
 from collections import deque
@@ -24,11 +29,15 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 from sqlalchemy.orm import Session, selectinload
 
 from src.catalog.models import Job
-from src.catalog.platforms import Platform, get_platform
+from src.catalog.platform_links import PlatformLink, load_platform_links
+from src.catalog.platforms import Platform, get_platform, load_platforms
 from src.catalog.services.job_runs import RUN_FAILED, RUN_RUNNING
 from src.catalog.services.sla import COMPLETED_LATE, LATE, MET, SEVERITY, evaluate_sla
 
 DIRECTIONS = ("upstream", "downstream", "both")
+
+#: Platform id of the view that joins every configured platform.
+ALL_PLATFORMS = "ALL"
 
 Graph = Tuple[Dict[str, Dict[str, Any]], List[Dict[str, Any]]]
 
@@ -72,6 +81,26 @@ def job_node_id(job_id: int) -> str:
     return f"job:{job_id}"
 
 
+def platform_scope(platform: str) -> Tuple[Dict[str, Platform], Dict[str, PlatformLink]]:
+    """The platforms a view covers and the dataset links it follows.
+
+    One platform: just that platform, no links (``ValueError`` if unknown).
+    ``ALL``: every configured platform, plus ``platform_links.csv`` keyed by
+    the linked target's dataset id.
+    """
+    if platform != ALL_PLATFORMS:
+        config = get_platform(platform)
+        return {config.id: config}, {}
+    links = {dataset_node_id(link.target_dataset): link for link in load_platform_links()}
+    return {p.id: p for p in load_platforms()}, links
+
+
+def canonical_dataset(dataset_name: str, links: Dict[str, PlatformLink]) -> str:
+    """The name a dataset goes by in a view: a linked target takes its source's name."""
+    link = links.get(dataset_node_id(dataset_name))
+    return link.source_dataset if link else dataset_name.strip()
+
+
 def _iso(value) -> Optional[str]:
     return value.isoformat() if value else None
 
@@ -94,13 +123,13 @@ class JobLineageService:
     # ---------- graph construction ----------
 
     def _load(self, platform: str, now: Optional[datetime] = None) -> Graph:
-        config = get_platform(platform)  # ValueError for an unknown platform
+        configs, links = platform_scope(platform)  # ValueError for an unknown platform
         jobs = (
             self.db.query(Job)
             .options(
                 selectinload(Job.files), selectinload(Job.executions), selectinload(Job.sla)
             )
-            .filter(Job.source_system == platform)
+            .filter(Job.source_system.in_(list(configs)))
             .order_by(Job.name)
             .all()
         )
@@ -108,8 +137,11 @@ class JobLineageService:
         nodes: Dict[str, Dict[str, Any]] = {}
         edges: Dict[str, Dict[str, Any]] = {}
         slas = {}  # job node id -> (expected completion, last run start)
+        joined: Dict[str, PlatformLink] = {}  # linked targets some job really uses
+        typed_by_target = set()  # dataset ids whose type came from a linked target
 
         for job in jobs:
+            config = configs[job.source_system]
             jid = job_node_id(job.id)
             latest = max(job.executions, key=lambda e: e.start_time, default=None)
             nodes[jid] = {
@@ -118,6 +150,7 @@ class JobLineageService:
                 "catalog_id": job.id,
                 "name": job.name,
                 "platform": job.source_system,
+                "platform_key": config.folder,
                 "platform_label": config.name,
                 "job_type": _job_type(job, config),
                 "owner": job.owner,
@@ -136,25 +169,46 @@ class JobLineageService:
                 slas[jid] = (job.sla.expected_completion, job.last_run)
 
             for f in job.files:
-                did = dataset_node_id(f.dataset_name)
+                link = links.get(dataset_node_id(f.dataset_name))
+                name = link.source_dataset if link else f.dataset_name.strip()
+                did = dataset_node_id(name)
                 dataset_type = (f.dataset_type or "").upper() or None
                 is_table = config.is_table(dataset_type)
-                nodes.setdefault(
-                    did,
-                    {
+                node = nodes.get(did)
+                if node is None:
+                    node = nodes[did] = {
                         "id": did,
                         "type": "dataset",
-                        "name": f.dataset_name.strip(),
+                        "name": name,
                         "dataset_type": dataset_type,
                         "is_table": is_table,
-                        "database": database_of(f.dataset_name, is_table),
-                    },
-                )
+                        "database": database_of(name, is_table),
+                        "platforms": [],
+                    }
+                    if link:
+                        typed_by_target.add(did)
+                elif not link and did in typed_by_target:
+                    # The source side describes the dataset; the target only received it.
+                    node["dataset_type"] = dataset_type
+                    typed_by_target.discard(did)
+                if is_table and not node["is_table"]:
+                    # A table on any platform that uses it (e.g. a Teradata table read by Ab Initio)
+                    node["is_table"] = True
+                    node["database"] = database_of(name, True)
+                if job.source_system not in node["platforms"]:
+                    node["platforms"].append(job.source_system)
+                if link:
+                    joined[dataset_node_id(link.target_dataset)] = link
                 direction = (f.direction or "").upper()
                 if direction in ("INPUT", "INOUT"):
                     self._add_edge(edges, did, jid, f.dd_name)
                 if direction in ("OUTPUT", "INOUT"):
                     self._add_edge(edges, jid, did, f.dd_name)
+
+        for link in joined.values():
+            node = nodes[dataset_node_id(link.source_dataset)]
+            node.setdefault("also_known_as", []).append(link.target_dataset)
+            node["transfer_method"] = link.method
 
         self._mark_impact(nodes, list(edges.values()))
         # SLA status depends on impact (a blocked job is at risk), so evaluate after it.

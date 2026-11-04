@@ -415,8 +415,14 @@ export interface PlatformInfo {
   summary: { jobs: number; failed: number; running: number; sla_late: number };
 }
 
-export const getLineagePlatforms = async () => {
-  const response = await apiClient.get<PlatformInfo[]>('/job-lineage/platforms');
+/** Platform id of the view that joins every platform where data flows between them. */
+export const ALL_PLATFORMS = 'ALL';
+
+/** The configured platforms; with includeAll, the All platforms view is listed last. */
+export const getLineagePlatforms = async (includeAll = false) => {
+  const response = await apiClient.get<PlatformInfo[]>('/job-lineage/platforms', {
+    params: includeAll ? { include_all: true } : undefined,
+  });
   return response.data;
 };
 export type LineageDirection = 'upstream' | 'downstream' | 'both';
@@ -442,6 +448,8 @@ export interface LineageJobNode extends LineageNodeBase {
   type: 'job';
   catalog_id: number;
   platform: LineagePlatform;
+  /** The job's platform URL key, e.g. 'mainframe' (also set in the All platforms view) */
+  platform_key?: string;
   platform_label: string;
   /** LOAD = writes one of the platform's tables; JOB = everything else */
   job_type: 'JOB' | 'LOAD';
@@ -464,6 +472,10 @@ export interface LineageDatasetNode extends LineageNodeBase {
   /** One of the platform's tables (vs. a source file or input) */
   is_table: boolean;
   database: string;
+  /** All platforms view: other names this dataset has after a hand-off, e.g. its Hadoop landing path */
+  also_known_as?: string[];
+  /** How the hand-off moves it, e.g. 'NDM file transfer' */
+  transfer_method?: string;
   /** Second label line for derived views (database / column graphs). */
   subtitle?: string;
 }

@@ -1,4 +1,8 @@
-"""Job lineage endpoints, each for one configured platform (see /job-lineage/platforms)."""
+"""Job lineage endpoints, each for one configured platform (see /job-lineage/platforms).
+
+Every endpoint also takes ``platform=ALL``: all platforms in one graph, joined
+where data flows between them (``platform_links.csv``).
+"""
 
 from typing import List, Optional
 
@@ -6,10 +10,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from src.catalog.database import get_db
+from src.catalog.platform_links import PlatformLinkError
 from src.catalog.platforms import PlatformConfigError, load_platforms
 from src.catalog.services.abinitio_sync import create_abinitio_sync_service
 from src.catalog.services.column_lineage import ColumnLineageService
-from src.catalog.services.job_lineage import JobLineageService
+from src.catalog.services.job_lineage import ALL_PLATFORMS, JobLineageService
 from src.catalog.services.lineage_sync import LineageSyncService
 from src.catalog.services.mainframe_sync import create_mainframe_sync_service
 from src.config import settings
@@ -23,32 +28,55 @@ from src.connectors.mainframe import MockMainframeConnector
 
 router = APIRouter()
 
-PLATFORM_HELP = "Platform id, e.g. MAINFRAME (see GET /job-lineage/platforms)"
+PLATFORM_HELP = (
+    "Platform id, e.g. MAINFRAME, or ALL for every platform (see GET /job-lineage/platforms)"
+)
 
 
 @router.get("/job-lineage/platforms", response_model=List[dict])
-async def list_job_lineage_platforms(db: Session = Depends(get_db)):
+async def list_job_lineage_platforms(
+    db: Session = Depends(get_db),
+    include_all: bool = Query(False, description="Also list the All platforms view (id ALL)"),
+):
     """
     The configured platforms (from ``platforms.csv``), each with a short summary:
     number of jobs, failed and running jobs, and jobs late against their SLA.
+
+    With ``include_all``, the last entry is the All platforms view (id ``ALL``),
+    when there is more than one platform.
     """
     try:
         platforms = load_platforms()
     except PlatformConfigError as e:
         raise HTTPException(status_code=500, detail=f"Invalid platforms file: {e}")
     service = JobLineageService(db)
-    result = []
-    for platform in platforms:
-        summary = service.get_graph(platform.id)["summary"]
+
+    def summary_of(platform_id: str) -> dict:
+        summary = service.get_graph(platform_id)["summary"]
+        return {
+            "jobs": summary["jobs"],
+            "failed": len(summary["failed_jobs"]),
+            "running": len(summary["running_jobs"]),
+            "sla_late": summary["sla_late"],
+        }
+
+    result = [{**platform.to_dict(), "summary": summary_of(platform.id)} for platform in platforms]
+    if include_all and len(platforms) > 1:
+        try:
+            all_summary = summary_of(ALL_PLATFORMS)
+        except PlatformLinkError as e:
+            raise HTTPException(status_code=500, detail=f"Invalid platform links file: {e}")
         result.append(
             {
-                **platform.to_dict(),
-                "summary": {
-                    "jobs": summary["jobs"],
-                    "failed": len(summary["failed_jobs"]),
-                    "running": len(summary["running_jobs"]),
-                    "sla_late": summary["sla_late"],
-                },
+                "id": ALL_PLATFORMS,
+                "key": "all",
+                "name": "All platforms",
+                "description": "Every platform in one graph, joined where data flows between them",
+                "job_label": "Job",
+                "table_label": "table",
+                "table_types": sorted({t for p in platforms for t in p.table_types}),
+                "color": "#475569",
+                "summary": all_summary,
             }
         )
     return result

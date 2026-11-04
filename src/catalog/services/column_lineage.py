@@ -1,4 +1,4 @@
-"""Column-level lineage and column search for one platform.
+"""Column-level lineage and column search for one platform, or all of them (``ALL``).
 
 Columns come from two places, merged:
 
@@ -21,9 +21,11 @@ from src.catalog.models import ColumnLineage, DatasetColumn, Job
 from src.catalog.services.job_lineage import (
     DIRECTIONS,
     JobLineageService,
+    canonical_dataset,
     database_of,
     dataset_node_id,
     job_node_id,
+    platform_scope,
 )
 
 COLUMN_SEPARATOR = "::"
@@ -52,9 +54,11 @@ class ColumnLineageService:
 
     def _load(self, platform: str) -> Tuple[Dict, List, Dict, List]:
         nodes, edges = self.job_lineage._load(platform)
+        configs, links = platform_scope(platform)
         columns: Dict[str, Dict[str, Any]] = {}
 
         def add(dataset: str, column: str, data_type=None, description=None, position=None):
+            dataset = canonical_dataset(dataset, links)  # a linked target is its source
             cid = column_node_id(dataset, column)
             existing = columns.get(cid)
             if existing:
@@ -82,7 +86,7 @@ class ColumnLineageService:
 
         listed = (
             self.db.query(DatasetColumn)
-            .filter(DatasetColumn.source_system == platform)
+            .filter(DatasetColumn.source_system.in_(list(configs)))
             .order_by(DatasetColumn.position)
         )
         for c in listed:
@@ -91,7 +95,7 @@ class ColumnLineageService:
         mappings = (
             self.db.query(ColumnLineage)
             .join(Job)
-            .filter(Job.source_system == platform)
+            .filter(Job.source_system.in_(list(configs)))
             .order_by(ColumnLineage.id)
         )
         column_edges = []

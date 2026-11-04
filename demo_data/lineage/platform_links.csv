@@ -1,0 +1,3 @@
+source_dataset,target_dataset,method,description
+PROD.CARDS.TXN.DAILY,/data/landing/cards/auth_feed,NDM file transfer,Daily card transactions sent from the mainframe to the Hadoop landing zone
+PROD.CIF.CUSTOMER.EXTRACT,/data/landing/customer/profile_feed,NDM file transfer,Customer master extract sent from the mainframe to the Hadoop landing zone
