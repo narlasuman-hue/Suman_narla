@@ -91,6 +91,19 @@ python -m migration status --config config/migration_config.yaml
 └── README.md
 ```
 
+## ServiceNow Incident Assistant
+
+Finds previously resolved ServiceNow incidents/requests that match a user's problem and
+returns the steps that fixed them:
+
+```bash
+export SERVICENOW_INSTANCE=acme SERVICENOW_TOKEN=...
+python -m src.servicenow_assist lookup INC0012345
+python -m src.servicenow_assist search "VPN keeps disconnecting on my laptop"
+```
+
+See `docs/SERVICENOW_ASSIST.md` for details.
+
 ## Configuration
 
 The migration is configured via `config/migration_config.yaml`. Key settings:
