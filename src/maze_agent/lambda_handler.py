@@ -13,6 +13,7 @@ Parameters:
     collected (str): comma-separated labels of coins already taken.
     keys (str): comma-separated key colors already held.
     max_steps (int), spike_damage (int), monster_damage (int): rule overrides.
+    optimize_rounds (int): route-optimisation restarts; 0 returns the fast greedy route.
 """
 
 from __future__ import annotations
@@ -28,7 +29,14 @@ from .planner import Rules, plan_route
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-_INT_PARAMS = ("hearts", "max_steps", "spike_damage", "monster_damage", "min_hearts_left")
+_INT_PARAMS = (
+    "hearts",
+    "max_steps",
+    "spike_damage",
+    "monster_damage",
+    "min_hearts_left",
+    "optimize_rounds",
+)
 
 
 def solve(params: dict[str, Any]) -> dict[str, Any]:

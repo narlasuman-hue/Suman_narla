@@ -34,11 +34,29 @@ Board format: one row per line, cells separated by spaces:
 See `src/maze_agent/boards/league_maze_1.txt` for the board from the screenshot.
 
 Parameters: `maze` (required), `start`, `hearts`, `collected`, `keys`, `max_steps`,
-`spike_damage`, `monster_damage`, `min_hearts_left`. Pass `start`/`collected`/`keys`
+`spike_damage`, `monster_damage`, `min_hearts_left`, `optimize_rounds`. Pass `start`/`collected`/`keys`
 to re-plan after a puzzle or anything unexpected.
 
-Result for the screenshot board: **all 32 coins, both keys, 0 spikes, 5/5 hearts,
-135 steps**. With `max_steps=60` it returns the best route within that limit (20 coins).
+How the route is built (`planner.py` then `optimizer.py`):
+
+1. **Greedy:** go to the nearest coin/key that still leaves a safe way to the chest.
+2. **Reorder:** improve the order of stops with local search (move 1-3 stops, reverse
+   sections) plus restarts that shake up the route, capped at `optimize_seconds` (5 s).
+3. **Fill in:** fit in any coins the route missed if hearts and `max_steps` allow.
+4. **Step limit:** also plan over every coin and drop the ones that cost the most steps
+   until the route fits, then keep whichever result collects more coins.
+
+Results for the screenshot board (0 spikes in every case):
+
+| Setting | Greedy only | Optimised |
+|---|---|---|
+| No limit | 32 coins, 135 steps | **32 coins, 77 steps** |
+| `max_steps=70` | n/a | 30 coins, 69 steps, chest |
+| `max_steps=60` | 20 coins, 59 steps | **25 coins**, 59 steps, chest |
+| `max_steps=40` | 16 coins (chest out of reach) | 18 coins |
+| `monster_damage=1` | 28 coins, 85 steps | 28 coins, **65 steps** |
+
+`optimize_rounds=0` skips step 2-4 and returns the greedy route in about 0.3 s.
 
 ### Deploy
 
@@ -48,7 +66,8 @@ mkdir -p build && cp -r src/maze_agent build/
 # Runtime: Python 3.12+, Handler: maze_agent.lambda_handler.lambda_handler
 ```
 
-No third-party dependencies. Give it 256 MB of memory and a 10-second timeout.
+No third-party dependencies. Give it 512 MB of memory and a **30-second timeout** (route
+optimisation uses up to about 5 seconds).
 
 Bedrock Agents action group (function details):
 
@@ -105,7 +124,8 @@ line explaining how you got it.
 
 ## Score tips
 
-- Re-plan after every surprise. The planner runs in under half a second.
+- Re-plan after every surprise. A full optimised plan takes about 2-3 seconds; pass
+  `optimize_rounds=0` for a sub-second greedy re-plan if time matters more than steps.
 - If the game has a move or time limit, set `max_steps` to it. The planner then
   drops far-away coins first.
 - If monster fights turn out to cost hearts, set `monster_damage=1`. The planner

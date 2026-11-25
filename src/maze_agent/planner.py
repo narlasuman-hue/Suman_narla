@@ -41,6 +41,10 @@ class Rules:
     max_steps: int | None = None
     # Entering the treasure usually ends the game, so never walk through it early.
     treasure_ends_game: bool = True
+    # Route optimisation: random restarts after local search (0 = greedy route only),
+    # capped by a wall-clock budget so the Lambda never times out.
+    optimize_rounds: int = 30
+    optimize_seconds: float = 5.0
 
 
 @dataclass
@@ -188,14 +192,35 @@ def _leg_damage(maze: Maze, rules: Rules, cells: list[Cell], cleared: set[Cell])
     return {c for c in cells if c in maze.monsters and c not in cleared}
 
 
+def _affordable(rules: Rules, cost: Cost, damage: int, steps: int) -> bool:
+    """True if taking ``cost`` on top of ``damage``/``steps`` stays within the rules."""
+    if rules.hearts - damage - cost[0] < rules.min_hearts_left:
+        return False
+    return rules.max_steps is None or steps + cost[2] <= rules.max_steps
+
+
 def plan_route(maze: Maze, rules: Rules | None = None) -> Plan:
-    """Plan a full route for ``maze`` under ``rules``."""
+    """Plan a full route for ``maze`` under ``rules``.
+
+    Builds a greedy route, then (unless ``rules.optimize_rounds`` is 0) reorders its
+    stops with local search to cut steps and fit in any coins it missed.
+    """
     rules = rules or Rules()
+    plan = _greedy_route(maze, rules)
+    if rules.optimize_rounds > 0:
+        from .optimizer import optimize_plan
+
+        plan = optimize_plan(maze, rules, plan)
+    return plan
+
+
+def _greedy_route(maze: Maze, rules: Rules) -> Plan:
+    """Nearest-target-first route with a safety check on every leg."""
     w = _Walker(maze, rules)
     allow_treasure_mid = not rules.treasure_ends_game
     # If the treasure cannot be reached safely at all, fall back to collecting safe coins.
     start_finish = _finish(maze, rules, w.pos, w.keys, w.cleared)
-    coins_only = start_finish is None or rules.hearts - start_finish[0][0] < rules.min_hearts_left
+    coins_only = start_finish is None or not _affordable(rules, start_finish[0], 0, 0)
 
     while True:
         dist, prev = _dijkstra(maze, rules, w.pos, w.keys, w.cleared, allow_treasure_mid)
@@ -226,7 +251,7 @@ def plan_route(maze: Maze, rules: Rules | None = None) -> Plan:
         w.walk(best[1])
 
     finish = None if coins_only else _finish(maze, rules, w.pos, w.keys, w.cleared)
-    if finish is not None and rules.hearts - w.damage - finish[0][0] >= rules.min_hearts_left:
+    if finish is not None and _affordable(rules, finish[0], w.damage, w.steps):
         w.walk(finish[1])
         w.plan.reached_treasure = True
     w.plan.hearts_left = rules.hearts - w.damage

@@ -90,6 +90,10 @@ def test_plan_route_respects_step_limit():
     assert len(plan.path) - 1 <= 60
     assert 0 < len(plan.coins) < 32
 
+    too_short = plan_route(maze, Rules(max_steps=40))
+    assert not too_short.reached_treasure  # the chest is at least 45 steps away
+    assert len(too_short.path) - 1 <= 40
+
 
 def test_plan_route_falls_back_to_safe_coins_when_treasure_too_costly():
     maze = parse_maze(BOARD)
@@ -144,3 +148,45 @@ def test_lambda_handler_bedrock_openapi_event():
 def test_lambda_handler_direct_invoke_error():
     out = lambda_handler({"maze": ""})
     assert out["statusCode"] == 400
+
+
+def _assert_valid(maze, plan):
+    assert plan.path[0] == maze.start
+    assert _adjacent(plan.path)
+    assert not any(c in maze.walls for c in plan.path)
+    for cell in plan.path:
+        if cell in maze.doors:
+            key_cells = [k for k, color in maze.keys.items() if color == maze.doors[cell]]
+            assert any(k in plan.path[: plan.path.index(cell)] for k in key_cells)
+
+
+def test_optimizer_cuts_steps_for_full_collection():
+    maze = parse_maze(BOARD)
+    greedy = plan_route(maze, Rules(optimize_rounds=0))
+    optimized = plan_route(maze, Rules())
+    _assert_valid(maze, optimized)
+    assert optimized.reached_treasure
+    assert len(optimized.coins) == len(greedy.coins) == 32
+    assert optimized.spikes_hit == []
+    assert len(optimized.path) - 1 <= 80 < len(greedy.path) - 1
+
+
+@pytest.mark.parametrize("limit", [40, 50, 60, 70])
+def test_optimizer_respects_step_limit_and_beats_greedy(limit):
+    maze = parse_maze(BOARD)
+    greedy = plan_route(maze, Rules(max_steps=limit, optimize_rounds=0))
+    optimized = plan_route(maze, Rules(max_steps=limit))
+    _assert_valid(maze, optimized)
+    assert len(optimized.path) - 1 <= limit
+    assert len(optimized.coins) >= len(greedy.coins)
+    assert optimized.reached_treasure == greedy.reached_treasure
+
+
+def test_optimizer_respects_hearts_with_monster_damage():
+    maze = parse_maze(BOARD)
+    greedy = plan_route(maze, Rules(monster_damage=1, optimize_rounds=0))
+    optimized = plan_route(maze, Rules(monster_damage=1))
+    _assert_valid(maze, optimized)
+    assert optimized.hearts_left >= 1
+    assert len(optimized.coins) == len(greedy.coins)
+    assert len(optimized.path) < len(greedy.path)
