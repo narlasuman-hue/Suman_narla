@@ -1,0 +1,12 @@
+// Board transcribed from the Game Play screenshot (columns A-J, rows 1-10).
+// .=empty #=wall C=coin ^=spikes M=monster S=start T=treasure K:<c>=key D:<c>=door
+S       C  C  .  .  .  .  .  C  C
+#       #  #  #  #  C  #  #  #  #
+K:red   #  .  C  C  M  C  C  #  K:green
+M       #  ^  #  .  C  #  ^  #  M
+C       .  .  C  C  C  C  C  C  .
+^       .  #  #  #  #  #  #  #  M
+C       .  M  .  ^  C  ^  .  C  .
+#       #  #  C  C  C  C  C  #  .
+C       C  #  ^  #  ^  #  ^  #  D:green
+T       C  D:red M C  M  C  M  C  C
